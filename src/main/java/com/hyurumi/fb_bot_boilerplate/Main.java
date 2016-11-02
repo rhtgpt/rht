@@ -56,16 +56,20 @@ public class Main {
                             if (messaging.message.text != null)
                                 Message.Text(messaging.message.text).sendTo(senderId);
                             else
-                                sendSampleGenericMessage(senderId);
+                               /// sendSampleGenericMessage(senderId);
+						    Message.Text("Yo reply by rohit bot").sendTo(senderId);
                             break;
                         case 1:
-                            Message.Image("https://unsplash.it/764/400?image=200").sendTo(senderId);
+                            //Message.Image("https://unsplash.it/764/400?image=200").sendTo(senderId);
+							 Message.Text("Yo reply by rohit bot").sendTo(senderId);
                             break;
                         case 2:
-                            sendSampleGenericMessage(senderId);
+                            //sendSampleGenericMessage(senderId);
+							 Message.Text("Yo reply by rohit bot").sendTo(senderId);
                             break;
                         default:
-                            sendSamplePostBackMessage(senderId);
+                            //sendSamplePostBackMessage(senderId);
+							 Message.Text("Yo reply by rohit bot").sendTo(senderId);
                             break;
                     }
 
