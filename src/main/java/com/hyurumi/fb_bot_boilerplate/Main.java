@@ -55,21 +55,26 @@ public class Main {
                         case 0:
                             if (messaging.message.text != null)
                                 Message.Text(messaging.message.text).sendTo(senderId);
+							   System.out.println(request.body());
                             else
                                /// sendSampleGenericMessage(senderId);
 						    Message.Text("Yo reply by rohit bot").sendTo(senderId);
+							   System.out.println(request.body());
                             break;
                         case 1:
                             //Message.Image("https://unsplash.it/764/400?image=200").sendTo(senderId);
 							 Message.Text("Yo reply by rohit bot").sendTo(senderId);
+							    System.out.println(request.body());
                             break;
                         case 2:
                             //sendSampleGenericMessage(senderId);
 							 Message.Text("Yo reply by rohit bot").sendTo(senderId);
+							    System.out.println(request.body());
                             break;
                         default:
                             //sendSamplePostBackMessage(senderId);
 							 Message.Text("Yo reply by rohit bot").sendTo(senderId);
+							    System.out.println(request.body());
                             break;
                     }
 
@@ -86,6 +91,7 @@ public class Main {
                     // sticker may not be supported for now.
                     System.out.println(request.body());
                 }
+				   System.out.println(request.body());
             }
             return "";
         });
