@@ -53,4 +53,4 @@ INSERT INTO GD.CIM_OPM_SMG3_LOGGING_NEW (
     RPAD('{"filter":"This is a filtration data example."}', 60000, '#') -- ~60KB CLOB
 );
 
-
+DROP TABLE GD.CIM_OPM_SMG3_LOGGING_NEW PURGE
