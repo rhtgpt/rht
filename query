@@ -1,20 +1,26 @@
-SELECT
-    df.tablespace_name,
-    df.total_mb,
-    NVL(fs.free_mb, 0) AS free_mb,
-    (df.total_mb - NVL(fs.free_mb, 0)) AS used_mb,
-    ROUND(((df.total_mb - NVL(fs.free_mb, 0)) / df.total_mb) * 100, 2) AS pct_used
-FROM
-    (SELECT
-         tablespace_name,
-         SUM(bytes) / 1024 / 1024 AS total_mb
-     FROM dba_data_files
-     GROUP BY tablespace_name) df
-LEFT JOIN
-    (SELECT
-         tablespace_name,
-         SUM(bytes) / 1024 / 1024 AS free_mb
-     FROM dba_free_space
-     GROUP BY tablespace_name) fs
-ON df.tablespace_name = fs.tablespace_name
-ORDER BY pct_used DESC;
+CREATE TABLE GD.CPI_OPM_SMG3_LOGGING_NEW (
+    TRACE_ID              VARCHAR2(36 BYTE),
+    ALIAS                 VARCHAR2(16 BYTE),
+    AUDIT_CREATE_DATE     TIMESTAMP(6) DEFAULT SYSTIMESTAMP,
+    SMG3_LOGGING_DATA     CLOB,
+    FILTRATION_JSON_DATA  CLOB
+)
+PARTITION BY RANGE (AUDIT_CREATE_DATE)
+SUBPARTITION BY LIST (MOD(ORA_HASH(TRACE_ID), 3)) 
+SUBPARTITION TEMPLATE (
+    SUBPARTITION sp0 VALUES (0)
+        LOB (SMG3_LOGGING_DATA) STORE AS (TABLESPACE GD_LOB_05),
+        LOB (FILTRATION_JSON_DATA) STORE AS (TABLESPACE GD_LOB_05),
+    SUBPARTITION sp1 VALUES (1)
+        LOB (SMG3_LOGGING_DATA) STORE AS (TABLESPACE GD_LOB_06),
+        LOB (FILTRATION_JSON_DATA) STORE AS (TABLESPACE GD_LOB_06),
+    SUBPARTITION sp2 VALUES (2)
+        LOB (SMG3_LOGGING_DATA) STORE AS (TABLESPACE GD_LOB_07),
+        LOB (FILTRATION_JSON_DATA) STORE AS (TABLESPACE GD_LOB_07)    
+)
+INTERVAL (NUMTODSINTERVAL(1, 'DAY'))
+(
+    PARTITION p0 VALUES LESS THAN (TIMESTAMP '2025-06-17 00:00:00')
+    COMPRESS FOR OLTP
+)
+ENABLE ROW MOVEMENT;
