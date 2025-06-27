@@ -39,3 +39,18 @@ CREATE TABLE PRODUCT (
     UPDATED_AT       TIMESTAMP
 );
 
+INSERT INTO GD.CIM_OPM_SMG3_LOGGING_NEW (
+    TRACE_ID,
+    ALIAS,
+    AUDIT_CREATE_DATE,
+    SMG3_LOGGING_DATA,
+    FILTRATION_JSON_DATA
+) VALUES (
+    '123e4567-e89b-12d3-a456-426614174000',
+    'SYSLOG',
+    TO_TIMESTAMP('2025-06-17 10:15:00', 'YYYY-MM-DD HH24:MI:SS'),
+    RPAD('{"log":"Sample logging data"}', 50000, '*'),  -- ~50KB CLOB
+    RPAD('{"filter":"This is a filtration data example."}', 60000, '#') -- ~60KB CLOB
+);
+
+
