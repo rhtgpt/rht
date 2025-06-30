@@ -180,4 +180,17 @@ UNION ALL
 SELECT
     'GD_LOB_07',
     COUNT(*) FROM GD.CIM_OFM_SMG3_LOGGING_NEW PARTITION (p_hash_2);
+===================================================
+SELECT
+    tablespace_name,
+    ROUND(SUM(bytes)/1024/1024, 2) AS lob_space_mb
+FROM
+    dba_segments
+WHERE
+    segment_type IN ('LOBSEGMENT', 'LOB PARTITION')
+GROUP BY
+    tablespace_name
+ORDER BY
+    lob_space_mb DESC;
+
 
