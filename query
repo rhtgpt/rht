@@ -133,3 +133,37 @@ UNION ALL
 SELECT
     'p_hash_2',
     COUNT(*) FROM GD.CIM_OFM_SMG3_LOGGING_NEW PARTITION (p_hash_2);
+
+SELECT
+    t.table_name,
+    p.partition_name,
+    p.tablespace_name,
+    p.num_rows
+FROM
+    all_tab_partitions p
+JOIN
+    all_tables t ON p.table_name = t.table_name
+WHERE
+    t.owner = 'GD'
+    AND t.table_name = 'CIM_OFM_SMG3_LOGGING_NEW'
+ORDER BY p.tablespace_name;
+
+
+SELECT
+    tablespace_name,
+    ROUND(SUM(bytes) / 1024 / 1024, 2) AS size_mb
+FROM
+    dba_segments
+WHERE
+    segment_type IN ('LOBSEGMENT', 'LOB PARTITION')
+    AND segment_name IN (
+        SELECT column_name
+        FROM all_lobs
+        WHERE table_name = 'CIM_OFM_SMG3_LOGGING_NEW' AND owner = 'GD'
+    )
+    AND owner = 'GD'
+GROUP BY
+    tablespace_name
+ORDER BY
+    size_mb DESC;
+
