@@ -247,16 +247,3 @@ WHERE tablespace_name = 'GD_LOB_05';
 
 ALTER TABLE GD.CIM_OFM_SMG3_LOGGING_NEW TRUNCATE PARTITION p_mon;
 Subject: Regarding Support Extension for GE MDM Project
-
-Dear [Recipient's Name],
-
-As discussed and confirmed over email, I had agreed to provide support for the GE MDM project until the 10th of July.
-
-However, I was recently informed by Angello about an expectation to extend my support for an additional three months. I would like to clarify that this extended support requirement was not communicated to me earlier, and I am currently fully allocated to a new project.
-
-Given that my current assignment demands my complete focus and effort, especially as I work to gain a strong command over the new responsibilities and aim for a good performance rating, I regret to inform you that I am unable to continue supporting the GE MDM project beyond the initially agreed date.
-
-I hope you understand my position, and I am happy to assist with a smooth transition or knowledge handover before the 10th of July.
-
-Best regards,
-[Your Full Name]
