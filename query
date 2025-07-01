@@ -239,8 +239,8 @@ PARTITION BY LIST (AUDIT_DAY_NAME)
 COMPRESS FOR OLTP;
 
 -- View all objects
-SELECT owner, segment_name
-FROM dba_segments
-WHERE tablespace_name = 'GD_LOB_05'
-  AND segment_type = 'TABLE';
+SELECT owner, table_name, column_name, partition_name
+FROM dba_lob_partitions
+WHERE tablespace_name = 'GD_LOB_05';
+
 
