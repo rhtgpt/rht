@@ -244,3 +244,5 @@ FROM dba_lob_partitions
 WHERE tablespace_name = 'GD_LOB_05';
 
 
+
+ALTER TABLE GD.CIM_OFM_SMG3_LOGGING_NEW TRUNCATE PARTITION p_mon;
