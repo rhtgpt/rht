@@ -238,3 +238,8 @@ PARTITION BY LIST (AUDIT_DAY_NAME)
 )
 COMPRESS FOR OLTP;
 
+-- View all objects
+SELECT 'DROP TABLE ' || owner || '.' || segment_name || ' PURGE;'
+FROM dba_segments
+WHERE tablespace_name = 'GD_LOB_05'
+  AND segment_type = 'TABLE';
