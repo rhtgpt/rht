@@ -247,3 +247,82 @@ WHERE tablespace_name = 'GD_LOB_05';
 
 ALTER TABLE GD.CIM_OFM_SMG3_LOGGING_NEW TRUNCATE PARTITION p_mon;
 Subject: Regarding Support Extension for GE MDM Project
+
+==================================================================
+Problem Statement
+
+	The existing Oracle table GD.CIM_OFM_SMG3_LOGGING was designed with:
+	Two large CLOB columns:
+	SMG3_LOGGING_DATA
+	FILTRATION_JSON_DATA
+
+	LOB storage in two dedicated tablespaces:
+	GD_LOB_03 for SMG3_LOGGING_DATA
+	GD_LOB_04 for FILTRATION_JSON_DATA
+
+Interval partitioning on AUDIT_CREATE_DATE (1-day interval)
+
+Challenge Faced:
+	Oracle does not support LOB storage clauses inside individual partitions when using interval partitioning.
+	This means all LOB data for every interval partition was being stored in only 2 LOB tablespaces.
+	Over time, this led to:
+
+		Tablespace saturation
+		Lack of flexibility to scale across multiple LOB tablespaces
+
+Objective
+	Resolve tablespace pressure by distributing CLOB data across multiple LOB tablespaces.
+	Ensure partitioning remains compatible with Oracle's restrictions.
+
+Solution: 
+	Switch to LIST Partitioning Based on TRACE_HASH
+	Instead of interval partitioning, the team restructured the table as follows:
+
+New Design Overview:
+
+	CREATE TABLE GD.CIM_OFM_SMG3_LOGGING_NEW (
+		TRACE_ID              VARCHAR2(36 BYTE),
+		ALIAS                 VARCHAR2(16 BYTE),
+		AUDIT_CREATE_DATE     TIMESTAMP(6) DEFAULT SYSTIMESTAMP,
+		TRACE_HASH            GENERATED ALWAYS AS (MOD(ORA_HASH(TRACE_ID), 3)) VIRTUAL,
+		SMG3_LOGGING_DATA     CLOB,
+		FILTRATION_JSON_DATA  CLOB
+	)
+	PARTITION BY LIST (TRACE_HASH)
+	(
+		PARTITION p_hash_0 VALUES (0)
+			LOB (SMG3_LOGGING_DATA) STORE AS (TABLESPACE GD_LOB_05),
+			LOB (FILTRATION_JSON_DATA) STORE AS (TABLESPACE GD_LOB_05),
+
+		PARTITION p_hash_1 VALUES (1)
+			LOB (SMG3_LOGGING_DATA) STORE AS (TABLESPACE GD_LOB_06),
+			LOB (FILTRATION_JSON_DATA) STORE AS (TABLESPACE GD_LOB_06),
+
+		PARTITION p_hash_2 VALUES (2)
+			LOB (SMG3_LOGGING_DATA) STORE AS (TABLESPACE GD_LOB_07),
+			LOB (FILTRATION_JSON_DATA) STORE AS (TABLESPACE GD_LOB_07)
+	)
+COMPRESS FOR OLTP;
+
+
+Oracle Constraint Considered
+	Oracle restricts partition-level LOB clause under INTERVAL-based RANGE partitioning.
+	Hence, the workaround was to partition by LIST using a derived virtual column (TRACE_HASH), giving full LOB control per partition.
+
+Optional Improvements
+	Rotate LOB tablespaces with time-based logic if more than 3 tablespace and partition are needed in the future.
+
+Conclusion
+	This redesign:
+	Fully resolves the LOB tablespace saturation issue.
+	Provides flexibility, scalability, and Oracle-compliant LOB control.
+	
+POC Verification
+A proof-of-concept (POC) was conducted by inserting 100 rows into GD.CIM_OFM_SMG3_LOGGING_NEW.
+
+Using DBA views and tablespace monitoring, it was confirmed that:
+- Rows were evenly distributed across the three partitions (p_hash_0, p_hash_1, p_hash_2)
+- CLOB data was stored in GD_LOB_05, GD_LOB_06, and GD_LOB_07 respectively as per partition mapping
+- Memory usage across these LOB tablespaces showed balanced utilization
+
+
