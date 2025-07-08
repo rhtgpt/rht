@@ -325,4 +325,5 @@ Using DBA views and tablespace monitoring, it was confirmed that:
 - CLOB data was stored in GD_LOB_05, GD_LOB_06, and GD_LOB_07 respectively as per partition mapping
 - Memory usage across these LOB tablespaces showed balanced utilization
 
+mvn dependency:tree | grep graphql
 
