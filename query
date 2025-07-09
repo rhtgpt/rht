@@ -327,3 +327,11 @@ Using DBA views and tablespace monitoring, it was confirmed that:
 
 mvn dependency:tree | grep graphql
 
+
+public com.lowes.entity.ItemAttributes getItemAttributesFromOps() {
+        Map<String, Object> featureValueMap = featureValue != null
+            ? featureValue.toMap()
+            : new HashMap<>();
+
+        return new com.lowes.entity.ItemAttributes(featureType, featureValueMap);
+    }
