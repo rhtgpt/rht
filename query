@@ -335,3 +335,16 @@ public com.lowes.entity.ItemAttributes getItemAttributesFromOps() {
 
         return new com.lowes.entity.ItemAttributes(featureType, featureValueMap);
     }
+public Map<String, Object> toMap() {
+    Map<String, Object> map = new HashMap<>();
+    if (assemblyOption != null) map.put("assemblyOption", assemblyOption);
+    if (deliveryOption != null) map.put("deliveryOption", deliveryOption);
+    if (paintColorNumber != null) map.put("paintColorNumber", paintColorNumber);
+    if (paintRgbCode != null) map.put("paintRgbCode", paintRgbCode);
+    if (paintColorName != null) map.put("paintColorName", paintColorName);
+    if (tintedPaint != null) map.put("tintedPaint", tintedPaint);
+    if (unitsOfMeasure != null) map.put("unitsOfMeasure", unitsOfMeasure);
+    if (hazmat != null) map.put("hazmat", hazmat);
+    if (shopKey != null) map.put("shopKey", shopKey);
+    return map;
+}
