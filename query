@@ -348,3 +348,20 @@ public Map<String, Object> toMap() {
     if (shopKey != null) map.put("shopKey", shopKey);
     return map;
 }
+public static FeatureValueDTO mapToFeatureValueDTO(Map<String, String> map) {
+    return new FeatureValueDTO(
+        sanitize(map.get("assemblyOption")),
+        sanitize(map.get("deliveryOption")),
+        sanitize(map.get("paintColorNumber")),
+        sanitize(map.get("paintRgbCode")),
+        sanitize(map.get("paintColorName")),
+        sanitize(map.get("tintedPaint")),
+        sanitize(map.get("unitsOfMeasure")),
+        sanitize(map.get("hazmat")),
+        sanitize(map.get("shopKey"))
+    );
+}
+
+private static String sanitize(String value) {
+    return (value == null || value.isBlank()) ? "" : value.trim();
+}
