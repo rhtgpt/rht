@@ -388,8 +388,9 @@ Restart your Java application.
 
 
 
-keytool -importcert -file C:\path\to\lowes.crt -alias lowes-api-cert ^
- -keystore "C:\Program Files\Java\jdk-<your-version>\lib\security\cacerts" ^
- -storepass changeit
+keytool -import -trustcacerts -alias lowes-api-cert ^
+ -file C:\path\to\lowes.crt ^
+ -keystore C:\Users\YourUsername\mytruststore.jks ^
+ -storepass mypassword
 
 
