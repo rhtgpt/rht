@@ -365,3 +365,24 @@ public static FeatureValueDTO mapToFeatureValueDTO(Map<String, String> map) {
 private static String sanitize(String value) {
     return (value == null || value.isBlank()) ? "" : value.trim();
 }
+
+
+Solution Steps:
+✅ Option 1: Import the SSL Certificate into Java Truststore
+Download the certificate:
+
+bash
+Copy
+Edit
+openssl s_client -connect api.int-hawkeye-dev.carbon.lowes.com:443 -showcerts
+Copy the certificate content (the part between -----BEGIN CERTIFICATE----- and -----END CERTIFICATE-----) and save it as lowes.crt.
+
+Import the certificate into your JVM's truststore:
+
+bash
+Copy
+Edit
+keytool -importcert -file lowes.crt -alias lowes-api-cert \
+-keystore $JAVA_HOME/lib/security/cacerts -storepass changeit
+Restart your Java application.
+
