@@ -1,9 +1,16 @@
- 1 * newOrderService.applyRules(_, _, _, _, _, _) >> { args ->
-        // Capture the rewardEvents argument if it's passed by reference (list)
-        capturedRewardEvents = []
-        capturedRewardEvents.add(expectedReward)
-        return capturedRewardEvents
-    }
+Subject: Issue with PO_RECEIPT Event for TO #400008102 – Missing received_date in Payload
 
-    result.size() == 1
-    result[0] == expectedReward
+Dear [Recipient's Name],
+
+On July 17, TOMS received a PO_RECEIPT event from SIMS for Transfer Order #400008102. During processing, a Null Pointer Exception was encountered because the received_date field—part of the shipment details—was missing in the event payload.
+
+As a result of this missing data, the status for this TO in the TOMS Database remains "shipped" and has not been updated to "DELIVERED".
+
+We kindly request that the source system team review this issue and ensure the received_date is included in future PO_RECEIPT events to prevent such discrepancies.
+
+Please let us know once the root cause is addressed or if further details are required.
+
+Best regards,
+[Your Full Name]
+[Your Role/Team]
+[Your Contact Information]
