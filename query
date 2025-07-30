@@ -1,40 +1,9 @@
-import graphql.GraphQLError;
-import graphql.language.SourceLocation;
-
-import java.util.List;
-import java.util.Map;
-
-public class SimpleGraphQLError implements GraphQLError {
-
-    private final String message;
-
-    public SimpleGraphQLError(String message) {
-        this.message = message;
+ 1 * newOrderService.applyRules(_, _, _, _, _, _) >> { args ->
+        // Capture the rewardEvents argument if it's passed by reference (list)
+        capturedRewardEvents = []
+        capturedRewardEvents.add(expectedReward)
+        return capturedRewardEvents
     }
 
-    @Override
-    public String getMessage() {
-        return message;
-    }
-
-    // Return null to remove these fields from response
-    @Override
-    public List<SourceLocation> getLocations() {
-        return null;
-    }
-
-    @Override
-    public List<Object> getPath() {
-        return null;
-    }
-
-    @Override
-    public Map<String, Object> getExtensions() {
-        return null;
-    }
-
-    @Override
-    public Map<String, Object> toSpecification() {
-        return Map.of("message", getMessage());
-    }
-}
+    result.size() == 1
+    result[0] == expectedReward
