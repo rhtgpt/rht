@@ -1,4 +1,177 @@
-we are changing the partitioning method (RANGE+INTERVAL → LIST on a virtual column), 
-and adding a virtual column, and 
-per‑partition LOB placement. 
-Oracle doesn’t support converting RANGE/INTERVAL → LIST via ALTER.
+Plan (summary)
+
+Create an interim table with the target design.
+
+DBMS_REDEFINITION (ROWID method) to copy data & dependents online.
+
+Finish/swap — the table keeps the original name.
+
+Recreate the (TRACE_ID, ALIAS) index (global).
+
+Validate & cleanup.
+
+⚠️ ORA_HASH(NULL) is NULL → doesn’t match any LIST partition. Either make TRACE_ID NOT NULL or use NVL inside the virtual column (script below uses NVL for safety).
+
+0) (Optional) Pre-checks
+-- Any invalids?
+SELECT owner, object_name, object_type, status
+FROM dba_objects
+WHERE owner='GD' AND object_name='CIM_OFM_SMG3_LOGGING';
+
+-- Locking/writes posture – ensure app can tolerate brief locks at FINISH phase.
+
+1) Create the interim (target) structure
+-- New structure as INTERIM table; same columns + virtual hash
+CREATE TABLE GD.CIM_OFM_SMG3_LOGGING_INT (
+  TRACE_ID              VARCHAR2(36 BYTE),
+  ALIAS                 VARCHAR2(16 BYTE),
+  AUDIT_CREATE_DATE     TIMESTAMP(6) DEFAULT SYSTIMESTAMP,
+  TRACE_HASH            GENERATED ALWAYS AS (MOD(ORA_HASH(NVL(TRACE_ID,'~')), 3)) VIRTUAL,
+  SMG3_LOGGING_DATA     CLOB,
+  FILTRATION_JSON_DATA  CLOB
+)
+PARTITION BY LIST (TRACE_HASH)
+(
+  PARTITION p_hash_0 VALUES (0)
+    LOB (SMG3_LOGGING_DATA)    STORE AS SECUREFILE (TABLESPACE GD_LOB_05 NOCACHE),
+    LOB (FILTRATION_JSON_DATA) STORE AS SECUREFILE (TABLESPACE GD_LOB_05 NOCACHE),
+
+  PARTITION p_hash_1 VALUES (1)
+    LOB (SMG3_LOGGING_DATA)    STORE AS SECUREFILE (TABLESPACE GD_LOB_06 NOCACHE),
+    LOB (FILTRATION_JSON_DATA) STORE AS SECUREFILE (TABLESPACE GD_LOB_06 NOCACHE),
+
+  PARTITION p_hash_2 VALUES (2)
+    LOB (SMG3_LOGGING_DATA)    STORE AS SECUREFILE (TABLESPACE GD_LOB_07 NOCACHE),
+    LOB (FILTRATION_JSON_DATA) STORE AS SECUREFILE (TABLESPACE GD_LOB_07 NOCACHE)
+)
+COMPRESS FOR OLTP;
+
+
+If you need NOLOGGING and/or COMPRESS HIGH on the LOBs, add those keywords in each STORE AS clause above.
+
+2) Start online redefinition (ROWID method)
+BEGIN
+  DBMS_REDEFINITION.CAN_REDEF_TABLE(
+    uname        => 'GD',
+    tname        => 'CIM_OFM_SMG3_LOGGING',
+    options_flag => DBMS_REDEFINITION.CONS_USE_ROWID
+  );
+END;
+/
+
+BEGIN
+  DBMS_REDEFINITION.START_REDEF_TABLE(
+    uname       => 'GD',
+    orig_table  => 'CIM_OFM_SMG3_LOGGING',
+    int_table   => 'CIM_OFM_SMG3_LOGGING_INT',
+    col_mapping => q'[
+      TRACE_ID,
+      ALIAS,
+      AUDIT_CREATE_DATE,
+      SMG3_LOGGING_DATA,
+      FILTRATION_JSON_DATA,
+      TRACE_HASH
+    ]'
+  );
+END;
+/
+
+3) Copy dependents (indexes, constraints, triggers, grants)
+DECLARE
+  l_errors PLS_INTEGER;
+BEGIN
+  DBMS_REDEFINITION.COPY_TABLE_DEPENDENTS(
+    uname            => 'GD',
+    orig_table       => 'CIM_OFM_SMG3_LOGGING',
+    int_table        => 'CIM_OFM_SMG3_LOGGING_INT',
+    num_errors       => l_errors,
+    copy_indexes     => DBMS_REDEFINITION.CONS_ORIG_PARAMS,
+    copy_triggers    => TRUE,
+    copy_constraints => TRUE,
+    copy_privileges  => TRUE,
+    ignore_errors    => FALSE
+  );
+END;
+/
+
+
+(Optional) resync just before cutover:
+
+BEGIN
+  DBMS_REDEFINITION.SYNC_INTERIM_TABLE(
+    uname      => 'GD',
+    orig_table => 'CIM_OFM_SMG3_LOGGING',
+    int_table  => 'CIM_OFM_SMG3_LOGGING_INT'
+  );
+END;
+/
+
+4) Finish (short lock/swap)
+BEGIN
+  DBMS_REDEFINITION.FINISH_REDEF_TABLE(
+    uname      => 'GD',
+    orig_table => 'CIM_OFM_SMG3_LOGGING',
+    int_table  => 'CIM_OFM_SMG3_LOGGING_INT'
+  );
+END;
+/
+
+
+At this point, GD.CIM_OFM_SMG3_LOGGING now has the LIST(TRACE_HASH) design and the LOBs per your new tablespaces.
+The interim table contains the old structure and will typically be renamed by Oracle; drop it if present.
+
+5) Recreate your index cleanly (global)
+-- Drop the old index name if it still exists and references the old design
+BEGIN
+  EXECUTE IMMEDIATE 'DROP INDEX GD.IDX_CPI_OPM_SMG3_LOGGING_IX1';
+EXCEPTION WHEN OTHERS THEN
+  IF SQLCODE != -1418 AND SQLCODE != -942 THEN RAISE; END IF; -- ignore "no such index" / "still in use"
+END;
+/
+
+-- Create a fresh global index aligned to your access pattern
+CREATE INDEX GD.IDX_CIM_OFM_SMG3_LOGGING_IX1
+ON GD.CIM_OFM_SMG3_LOGGING (TRACE_ID, ALIAS);
+
+
+If you prefer LOCAL indexes, you’d typically include TRACE_HASH and declare LOCAL. For lookups by (TRACE_ID, ALIAS), a global index is usually best.
+
+6) Validate
+-- Partitions
+SELECT partition_name, high_value
+FROM   dba_tab_partitions
+WHERE  table_owner='GD' AND table_name='CIM_OFM_SMG3_LOGGING'
+ORDER  BY partition_position;
+
+-- Virtual column check
+SELECT column_name, data_default, virtual_column
+FROM   dba_tab_cols
+WHERE  owner='GD' AND table_name='CIM_OFM_SMG3_LOGGING'
+AND    column_name='TRACE_HASH';
+
+-- LOB segments and tablespaces
+SELECT l.column_name, s.segment_name, s.tablespace_name
+FROM   dba_lobs l
+JOIN   dba_segments s
+  ON   s.owner=l.owner AND s.segment_name=l.segment_name
+WHERE  l.owner='GD' AND l.table_name='CIM_OFM_SMG3_LOGGING'
+ORDER  BY l.column_name;
+
+-- Quick routing sanity
+SELECT TRACE_HASH, COUNT(*) FROM GD.CIM_OFM_SMG3_LOGGING GROUP BY TRACE_HASH ORDER BY 1;
+
+Notes / gotchas
+
+Keep the NVL in TRACE_HASH unless you enforce TRACE_ID NOT NULL.
+
+If you ever increase buckets (e.g., from 3 to 16), that’s another redefinition. Choose modulus wisely for future scale.
+
+If LOB redo is a concern, add NOLOGGING in the STORE AS clauses (ensure it’s consistent with your RPO/RTO).
+
+TL;DR
+
+Use DBMS_REDEFINITION with an interim table to keep the same table name and convert to LIST(TRACE_HASH).
+
+Scripts above handle the full flow: create interim → redefine → finish → reindex → validate.
+
+Safe for online workloads with only a brief lock at the final swap.
