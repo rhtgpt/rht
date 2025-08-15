@@ -1,177 +1,97 @@
-Plan (summary)
+Requirement Understanding – TOM (Store/BDC Returns & Validation)
+1. Purpose
 
-Create an interim table with the target design.
+The TOM (Transfer Order Management) system needs to validate the Store/BDC service area pairing for transfer orders (TOs), particularly for non-allocated/open TOs.
+This ensures that orders are routed correctly and prevents invalid Store/BDC combinations from moving forward.
 
-DBMS_REDEFINITION (ROWID method) to copy data & dependents online.
+2. Key Integrations
 
-Finish/swap — the table keeps the original name.
+Service Area Integration – Used to validate Store/BDC pairing.
 
-Recreate the (TRACE_ID, ALIAS) index (global).
+YAML links for outbound integrations: SCNP Design Confluence Page
 
-Validate & cleanup.
+Contacts:
 
-⚠️ ORA_HASH(NULL) is NULL → doesn’t match any LIST partition. Either make TRACE_ID NOT NULL or use NVL inside the virtual column (script below uses NVL for safety).
+Ritesh Kumar (SSC-B)
 
-0) (Optional) Pre-checks
--- Any invalids?
-SELECT owner, object_name, object_type, status
-FROM dba_objects
-WHERE owner='GD' AND object_name='CIM_OFM_SMG3_LOGGING';
+Ryan Fehnal (US-based dev)
 
--- Locking/writes posture – ensure app can tolerate brief locks at FINISH phase.
+Suriya E. Prakash (Product)
 
-1) Create the interim (target) structure
--- New structure as INTERIM table; same columns + virtual hash
-CREATE TABLE GD.CIM_OFM_SMG3_LOGGING_INT (
-  TRACE_ID              VARCHAR2(36 BYTE),
-  ALIAS                 VARCHAR2(16 BYTE),
-  AUDIT_CREATE_DATE     TIMESTAMP(6) DEFAULT SYSTIMESTAMP,
-  TRACE_HASH            GENERATED ALWAYS AS (MOD(ORA_HASH(NVL(TRACE_ID,'~')), 3)) VIRTUAL,
-  SMG3_LOGGING_DATA     CLOB,
-  FILTRATION_JSON_DATA  CLOB
-)
-PARTITION BY LIST (TRACE_HASH)
-(
-  PARTITION p_hash_0 VALUES (0)
-    LOB (SMG3_LOGGING_DATA)    STORE AS SECUREFILE (TABLESPACE GD_LOB_05 NOCACHE),
-    LOB (FILTRATION_JSON_DATA) STORE AS SECUREFILE (TABLESPACE GD_LOB_05 NOCACHE),
+3. Execution Flow
+Daily / Nightly Process
 
-  PARTITION p_hash_1 VALUES (1)
-    LOB (SMG3_LOGGING_DATA)    STORE AS SECUREFILE (TABLESPACE GD_LOB_06 NOCACHE),
-    LOB (FILTRATION_JSON_DATA) STORE AS SECUREFILE (TABLESPACE GD_LOB_06 NOCACHE),
+TOM runs a process (daily or nightly) to check:
 
-  PARTITION p_hash_2 VALUES (2)
-    LOB (SMG3_LOGGING_DATA)    STORE AS SECUREFILE (TABLESPACE GD_LOB_07 NOCACHE),
-    LOB (FILTRATION_JSON_DATA) STORE AS SECUREFILE (TABLESPACE GD_LOB_07 NOCACHE)
-)
-COMPRESS FOR OLTP;
+All non-allocated and open TOs.
 
+Validity of the Store/BDC pairing using Service Area mapping.
 
-If you need NOLOGGING and/or COMPRESS HIGH on the LOBs, add those keywords in each STORE AS clause above.
+Conditions for Validation
 
-2) Start online redefinition (ROWID method)
-BEGIN
-  DBMS_REDEFINITION.CAN_REDEF_TABLE(
-    uname        => 'GD',
-    tname        => 'CIM_OFM_SMG3_LOGGING',
-    options_flag => DBMS_REDEFINITION.CONS_USE_ROWID
-  );
-END;
-/
+TOM validates existing TOs when:
 
-BEGIN
-  DBMS_REDEFINITION.START_REDEF_TABLE(
-    uname       => 'GD',
-    orig_table  => 'CIM_OFM_SMG3_LOGGING',
-    int_table   => 'CIM_OFM_SMG3_LOGGING_INT',
-    col_mapping => q'[
-      TRACE_ID,
-      ALIAS,
-      AUDIT_CREATE_DATE,
-      SMG3_LOGGING_DATA,
-      FILTRATION_JSON_DATA,
-      TRACE_HASH
-    ]'
-  );
-END;
-/
+TO Level Status = OPEN (not "FULFILLMENT IN PROGRESS")
 
-3) Copy dependents (indexes, constraints, triggers, grants)
-DECLARE
-  l_errors PLS_INTEGER;
-BEGIN
-  DBMS_REDEFINITION.COPY_TABLE_DEPENDENTS(
-    uname            => 'GD',
-    orig_table       => 'CIM_OFM_SMG3_LOGGING',
-    int_table        => 'CIM_OFM_SMG3_LOGGING_INT',
-    num_errors       => l_errors,
-    copy_indexes     => DBMS_REDEFINITION.CONS_ORIG_PARAMS,
-    copy_triggers    => TRUE,
-    copy_constraints => TRUE,
-    copy_privileges  => TRUE,
-    ignore_errors    => FALSE
-  );
-END;
-/
+TO Order Line Status = CREATED (less than "ALLOCATED")
 
+TO Type ≠ "CT" (exclude TOs with this type)
 
-(Optional) resync just before cutover:
+4. Decision Logic
+A. Store/BDC Pairing is VALID for all order lines
 
-BEGIN
-  DBMS_REDEFINITION.SYNC_INTERIM_TABLE(
-    uname      => 'GD',
-    orig_table => 'CIM_OFM_SMG3_LOGGING',
-    int_table  => 'CIM_OFM_SMG3_LOGGING_INT'
-  );
-END;
-/
+Action: No further steps required.
 
-4) Finish (short lock/swap)
-BEGIN
-  DBMS_REDEFINITION.FINISH_REDEF_TABLE(
-    uname      => 'GD',
-    orig_table => 'CIM_OFM_SMG3_LOGGING',
-    int_table  => 'CIM_OFM_SMG3_LOGGING_INT'
-  );
-END;
-/
+B. Store/BDC Pairing is INVALID for ALL order lines
 
+Action:
 
-At this point, GD.CIM_OFM_SMG3_LOGGING now has the LIST(TRACE_HASH) design and the LOBs per your new tablespaces.
-The interim table contains the old structure and will typically be renamed by Oracle; drop it if present.
+Cancel the entire TO.
 
-5) Recreate your index cleanly (global)
--- Drop the old index name if it still exists and references the old design
-BEGIN
-  EXECUTE IMMEDIATE 'DROP INDEX GD.IDX_CPI_OPM_SMG3_LOGGING_IX1';
-EXCEPTION WHEN OTHERS THEN
-  IF SQLCODE != -1418 AND SQLCODE != -942 THEN RAISE; END IF; -- ignore "no such index" / "still in use"
-END;
-/
+Set reason = INVALID SERVICE AREA.
 
--- Create a fresh global index aligned to your access pattern
-CREATE INDEX GD.IDX_CIM_OFM_SMG3_LOGGING_IX1
-ON GD.CIM_OFM_SMG3_LOGGING (TRACE_ID, ALIAS);
+Publish a TO CANCELLED event for consumers.
 
+Scenarios:
 
-If you prefer LOCAL indexes, you’d typically include TRACE_HASH and declare LOCAL. For lookups by (TRACE_ID, ALIAS), a global index is usually best.
+Single Line TO – Invalid service area.
 
-6) Validate
--- Partitions
-SELECT partition_name, high_value
-FROM   dba_tab_partitions
-WHERE  table_owner='GD' AND table_name='CIM_OFM_SMG3_LOGGING'
-ORDER  BY partition_position;
+Multi-Line TO – All lines have invalid service area.
 
--- Virtual column check
-SELECT column_name, data_default, virtual_column
-FROM   dba_tab_cols
-WHERE  owner='GD' AND table_name='CIM_OFM_SMG3_LOGGING'
-AND    column_name='TRACE_HASH';
+C. Store/BDC Pairing is INVALID for some order lines (but valid for others)
 
--- LOB segments and tablespaces
-SELECT l.column_name, s.segment_name, s.tablespace_name
-FROM   dba_lobs l
-JOIN   dba_segments s
-  ON   s.owner=l.owner AND s.segment_name=l.segment_name
-WHERE  l.owner='GD' AND l.table_name='CIM_OFM_SMG3_LOGGING'
-ORDER  BY l.column_name;
+Action:
 
--- Quick routing sanity
-SELECT TRACE_HASH, COUNT(*) FROM GD.CIM_OFM_SMG3_LOGGING GROUP BY TRACE_HASH ORDER BY 1;
+Cancel only invalid order lines.
 
-Notes / gotchas
+Keep valid lines as-is.
 
-Keep the NVL in TRACE_HASH unless you enforce TRACE_ID NOT NULL.
+Publish TO UPDATE event for consumers.
 
-If you ever increase buckets (e.g., from 3 to 16), that’s another redefinition. Choose modulus wisely for future scale.
+Scenario Example (Multi-line TO):
 
-If LOB redo is a concern, add NOLOGGING in the STORE AS clauses (ensure it’s consistent with your RPO/RTO).
+Line 1 → VALID service area.
 
-TL;DR
+Line 2 → INVALID service area → Cancelled.
 
-Use DBMS_REDEFINITION with an interim table to keep the same table name and convert to LIST(TRACE_HASH).
+5. Error Reporting
 
-Scripts above handle the full flow: create interim → redefine → finish → reindex → validate.
+For Store-BDC:
 
-Safe for online workloads with only a brief lock at the final swap.
+TOM rejects the TO and sends an update to Bullseye.
+
+Bullseye sends a new TO request with the correct Store/BDC pairing.
+
+For TOM Consumers (e.g., IRP, Keystone):
+
+Method of error reporting is TBD for some cases.
+
+6. Test Readiness
+
+Once the above validations and integrations are in place, it will be ready for E2E testing.
+
+7. Summary Table
+Scenario	Store/BDC Pairing	Action	Event Published
+A	All Valid	No action	None
+B	All Invalid	Cancel Entire TO	TO CANCELLED
+C	Some Invalid	Cancel Invalid Lines	TO UPDATE
