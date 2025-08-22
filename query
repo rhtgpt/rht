@@ -1,33 +1,23 @@
-CREATE TABLE txns (
-  txn_id              NUMBER,
-  region              VARCHAR2(10),
-  txn_date            DATE NOT NULL,
-  amount              NUMBER,
-  txn_details         CLOB,
-  txn_payload         CLOB,
-  CONSTRAINT pk_txns PRIMARY KEY (txn_id)
+CREATE TABLE GD.CIM_OFM_SMG3_LOGGING (
+    TRACE_ID               VARCHAR2(36 BYTE),
+    ALIAS                  VARCHAR2(16 BYTE),
+    AUDIT_CREATE_DATE      TIMESTAMP(6) DEFAULT SYSTIMESTAMP,
+    SMG3_LOGGING_DATA      CLOB,
+    FILTRATION_JSON_DATA   CLOB
 )
-PARTITION BY RANGE (txn_date)
-  INTERVAL (NUMTODSINTERVAL(1,'DAY'))
-SUBPARTITION BY LIST (region)
+PARTITION BY RANGE (AUDIT_CREATE_DATE)
+  INTERVAL (NUMTODSINTERVAL(1, 'DAY'))
+SUBPARTITION BY LIST (MOD(ORA_HASH(TRACE_ID), 2))
 SUBPARTITION TEMPLATE (
-  SUBPARTITION r_asia VALUES ('ASIA')
-    LOB (txn_details) STORE AS lob_txn_details_asia (TABLESPACE GD_LOB_04),
-    LOB (txn_payload) STORE AS lob_txn_payload_asia (TABLESPACE GD_LOB_03),
+  SUBPARTITION sp0 VALUES (0)
+    LOB (SMG3_LOGGING_DATA) STORE AS smg3_lob_sp0 (TABLESPACE GD_LOB_03),
+    LOB (FILTRATION_JSON_DATA) STORE AS filter_lob_sp0 (TABLESPACE GD_LOB_04),
 
-  SUBPARTITION r_eu VALUES ('EU')
-    LOB (txn_details) STORE AS lob_txn_details_eu (TABLESPACE GD_LOB_04),
-    LOB (txn_payload) STORE AS lob_txn_payload_eu (TABLESPACE GD_LOB_03),
-
-  SUBPARTITION r_us VALUES ('US')
-    LOB (txn_details) STORE AS lob_txn_details_us (TABLESPACE GD_LOB_04),
-    LOB (txn_payload) STORE AS lob_txn_payload_us (TABLESPACE GD_LOB_03),
-
-  SUBPARTITION r_other VALUES (DEFAULT)
-    LOB (txn_details) STORE AS lob_txn_details_other (TABLESPACE GD_LOB_04),
-    LOB (txn_payload) STORE AS lob_txn_payload_other (TABLESPACE GD_LOB_03)
+  SUBPARTITION sp1 VALUES (1)
+    LOB (SMG3_LOGGING_DATA) STORE AS smg3_lob_sp1 (TABLESPACE GD_LOB_03),
+    LOB (FILTRATION_JSON_DATA) STORE AS filter_lob_sp1 (TABLESPACE GD_LOB_04)
 )
 (
-  PARTITION p_seed VALUES LESS THAN (DATE '2025-01-01')
+  PARTITION p_seed VALUES LESS THAN (TIMESTAMP '2025-01-01 00:00:00')
 )
 ENABLE ROW MOVEMENT;
