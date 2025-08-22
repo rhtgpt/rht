@@ -1,19 +1,33 @@
 CREATE TABLE txns (
-  txn_id   NUMBER,
-  region   VARCHAR2(10),
-  txn_date DATE NOT NULL,
-  amount   NUMBER,
+  txn_id              NUMBER,
+  region              VARCHAR2(10),
+  txn_date            DATE NOT NULL,
+  amount              NUMBER,
+  txn_details         CLOB,
+  txn_payload         CLOB,
   CONSTRAINT pk_txns PRIMARY KEY (txn_id)
 )
 PARTITION BY RANGE (txn_date)
   INTERVAL (NUMTODSINTERVAL(1,'DAY'))
 SUBPARTITION BY LIST (region)
 SUBPARTITION TEMPLATE (
-  SUBPARTITION r_asia  VALUES ('ASIA')  TABLESPACE ts_data_asia  COMPRESS FOR OLTP,
-  SUBPARTITION r_eu    VALUES ('EU')    TABLESPACE ts_data_eu    NOCOMPRESS,
-  SUBPARTITION r_us    VALUES ('US')    TABLESPACE ts_data_us,
-  SUBPARTITION r_other VALUES (DEFAULT) TABLESPACE ts_data_other
+  SUBPARTITION r_asia VALUES ('ASIA')
+    LOB (txn_details) STORE AS (TABLESPACE GD_LOB_04),
+    LOB (txn_payload) STORE AS (TABLESPACE GD_LOB_03),
+
+  SUBPARTITION r_eu VALUES ('EU')
+    LOB (txn_details) STORE AS (TABLESPACE GD_LOB_04),
+    LOB (txn_payload) STORE AS (TABLESPACE GD_LOB_03),
+
+  SUBPARTITION r_us VALUES ('US')
+    LOB (txn_details) STORE AS (TABLESPACE GD_LOB_04),
+    LOB (txn_payload) STORE AS (TABLESPACE GD_LOB_03),
+
+  SUBPARTITION r_other VALUES (DEFAULT)
+    LOB (txn_details) STORE AS (TABLESPACE GD_LOB_04),
+    LOB (txn_payload) STORE AS (TABLESPACE GD_LOB_03)
 )
 (
-  PARTITION p_seed VALUES LESS THAN (DATE '2025-01-01')  -- required seed
-);
+  PARTITION p_seed VALUES LESS THAN (DATE '2025-01-01')
+)
+ENABLE ROW MOVEMENT;
