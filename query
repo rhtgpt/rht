@@ -1,97 +1,80 @@
-Requirement Understanding – TOM (Store/BDC Returns & Validation)
-1. Purpose
+CREATE TABLE GD.CPI_OPM_SMG3_LOGGING (
+  TRACE_ID              VARCHAR2(36 BYTE),
+  ALIAS                 VARCHAR2(16 BYTE),
+  AUDIT_CREATE_DATE     TIMESTAMP(6) DEFAULT SYSTIMESTAMP,
+  SMG3_LOGGING_DATA     CLOB,
+  FILTRATION_JSON_DATA  CLOB
+)
+PARTITION BY RANGE (AUDIT_CREATE_DATE)
+  INTERVAL (NUMTODSINTERVAL(1, 'DAY'))
+SUBPARTITION BY HASH (TRACE_ID)
 
-The TOM (Transfer Order Management) system needs to validate the Store/BDC service area pairing for transfer orders (TOs), particularly for non-allocated/open TOs.
-This ensures that orders are routed correctly and prevents invalid Store/BDC combinations from moving forward.
-
-2. Key Integrations
-
-Service Area Integration – Used to validate Store/BDC pairing.
-
-YAML links for outbound integrations: SCNP Design Confluence Page
-
-Contacts:
-
-Ritesh Kumar (SSC-B)
-
-Ryan Fehnal (US-based dev)
-
-Suriya E. Prakash (Product)
-
-3. Execution Flow
-Daily / Nightly Process
-
-TOM runs a process (daily or nightly) to check:
-
-All non-allocated and open TOs.
-
-Validity of the Store/BDC pairing using Service Area mapping.
-
-Conditions for Validation
-
-TOM validates existing TOs when:
-
-TO Level Status = OPEN (not "FULFILLMENT IN PROGRESS")
-
-TO Order Line Status = CREATED (less than "ALLOCATED")
-
-TO Type ≠ "CT" (exclude TOs with this type)
-
-4. Decision Logic
-A. Store/BDC Pairing is VALID for all order lines
-
-Action: No further steps required.
-
-B. Store/BDC Pairing is INVALID for ALL order lines
-
-Action:
-
-Cancel the entire TO.
-
-Set reason = INVALID SERVICE AREA.
-
-Publish a TO CANCELLED event for consumers.
-
-Scenarios:
-
-Single Line TO – Invalid service area.
-
-Multi-Line TO – All lines have invalid service area.
-
-C. Store/BDC Pairing is INVALID for some order lines (but valid for others)
-
-Action:
-
-Cancel only invalid order lines.
-
-Keep valid lines as-is.
-
-Publish TO UPDATE event for consumers.
-
-Scenario Example (Multi-line TO):
-
-Line 1 → VALID service area.
-
-Line 2 → INVALID service area → Cancelled.
-
-5. Error Reporting
-
-For Store-BDC:
-
-TOM rejects the TO and sends an update to Bullseye.
-
-Bullseye sends a new TO request with the correct Store/BDC pairing.
-
-For TOM Consumers (e.g., IRP, Keystone):
-
-Method of error reporting is TBD for some cases.
-
-6. Test Readiness
-
-Once the above validations and integrations are in place, it will be ready for E2E testing.
-
-7. Summary Table
-Scenario	Store/BDC Pairing	Action	Event Published
-A	All Valid	No action	None
-B	All Invalid	Cancel Entire TO	TO CANCELLED
-C	Some Invalid	Cancel Invalid Lines	TO UPDATE
+SUBPARTITION TEMPLATE (
+  SUBPARTITION sp1 TABLESPACE GD_DATA_01
+    LOB (SMG3_LOGGING_DATA) STORE AS SECUREFILE (
+      ENABLE STORAGE IN ROW
+      CHUNK 8192
+      RETENTION
+      COMPRESS HIGH
+      NOCACHE
+    )
+    LOB (FILTRATION_JSON_DATA) STORE AS SECUREFILE (
+      ENABLE STORAGE IN ROW
+      CHUNK 8192
+      RETENTION
+      NOCACHE
+      NOLOGGING
+    ),
+  SUBPARTITION sp2 TABLESPACE GD_DATA_02
+    LOB (SMG3_LOGGING_DATA) STORE AS SECUREFILE (
+      ENABLE STORAGE IN ROW
+      CHUNK 8192
+      RETENTION
+      COMPRESS HIGH
+      NOCACHE
+    )
+    LOB (FILTRATION_JSON_DATA) STORE AS SECUREFILE (
+      ENABLE STORAGE IN ROW
+      CHUNK 8192
+      RETENTION
+      NOCACHE
+      NOLOGGING
+    )
+)
+(
+  PARTITION p_seed VALUES LESS THAN (TIMESTAMP '2025-06-17 00:00:00')
+    COMPRESS FOR OLTP
+    (
+      SUBPARTITION p_seed_sp1 TABLESPACE GD_DATA_01
+        LOB (SMG3_LOGGING_DATA) STORE AS SECUREFILE (
+          ENABLE STORAGE IN ROW
+          CHUNK 8192
+          RETENTION
+          COMPRESS HIGH
+          NOCACHE
+        )
+        LOB (FILTRATION_JSON_DATA) STORE AS SECUREFILE (
+          ENABLE STORAGE IN ROW
+          CHUNK 8192
+          RETENTION
+          NOCACHE
+          NOLOGGING
+        ),
+      SUBPARTITION p_seed_sp2 TABLESPACE GD_DATA_02
+        LOB (SMG3_LOGGING_DATA) STORE AS SECUREFILE (
+          ENABLE STORAGE IN ROW
+          CHUNK 8192
+          RETENTION
+          COMPRESS HIGH
+          NOCACHE
+        )
+        LOB (FILTRATION_JSON_DATA) STORE AS SECUREFILE (
+          ENABLE STORAGE IN ROW
+          CHUNK 8192
+          RETENTION
+          NOCACHE
+          NOLOGGING
+        )
+    )
+)
+ENABLE ROW MOVEMENT;
