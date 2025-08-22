@@ -1,1 +1,19 @@
-SELECT username, default_tablespace FROM dba_users WHERE username = 'GD';
+CREATE TABLE txns (
+  txn_id   NUMBER,
+  region   VARCHAR2(10),
+  txn_date DATE NOT NULL,
+  amount   NUMBER,
+  CONSTRAINT pk_txns PRIMARY KEY (txn_id)
+)
+PARTITION BY RANGE (txn_date)
+  INTERVAL (NUMTODSINTERVAL(1,'DAY'))
+SUBPARTITION BY LIST (region)
+SUBPARTITION TEMPLATE (
+  SUBPARTITION r_asia  VALUES ('ASIA')  TABLESPACE ts_data_asia  COMPRESS FOR OLTP,
+  SUBPARTITION r_eu    VALUES ('EU')    TABLESPACE ts_data_eu    NOCOMPRESS,
+  SUBPARTITION r_us    VALUES ('US')    TABLESPACE ts_data_us,
+  SUBPARTITION r_other VALUES (DEFAULT) TABLESPACE ts_data_other
+)
+(
+  PARTITION p_seed VALUES LESS THAN (DATE '2025-01-01')  -- required seed
+);
