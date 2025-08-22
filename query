@@ -10,20 +10,20 @@ PARTITION BY RANGE (AUDIT_CREATE_DATE)
 SUBPARTITION BY LIST (ALIAS)
 SUBPARTITION TEMPLATE (
   SUBPARTITION r_asia VALUES ('ASIA')
-    LOB (txn_details) STORE AS lob_txn_details_asia (TABLESPACE GD_LOB_04),
-    LOB (txn_payload) STORE AS lob_txn_payload_asia (TABLESPACE GD_LOB_03),
+    LOB (SMG3_LOGGING_DATA) STORE AS lob_txn_details_asia (TABLESPACE GD_LOB_04),
+    LOB (FILTRATION_JSON_DATA) STORE AS lob_txn_payload_asia (TABLESPACE GD_LOB_03),
 
   SUBPARTITION r_eu VALUES ('EU')
-    LOB (txn_details) STORE AS lob_txn_details_eu (TABLESPACE GD_LOB_04),
-    LOB (txn_payload) STORE AS lob_txn_payload_eu (TABLESPACE GD_LOB_03),
+    LOB (SMG3_LOGGING_DATA) STORE AS lob_txn_details_eu (TABLESPACE GD_LOB_04),
+    LOB (FILTRATION_JSON_DATA) STORE AS lob_txn_payload_eu (TABLESPACE GD_LOB_03),
 
   SUBPARTITION r_us VALUES ('US')
-    LOB (txn_details) STORE AS lob_txn_details_us (TABLESPACE GD_LOB_04),
-    LOB (txn_payload) STORE AS lob_txn_payload_us (TABLESPACE GD_LOB_03),
+    LOB (SMG3_LOGGING_DATA) STORE AS lob_txn_details_us (TABLESPACE GD_LOB_04),
+    LOB (FILTRATION_JSON_DATA) STORE AS lob_txn_payload_us (TABLESPACE GD_LOB_03),
 
   SUBPARTITION r_other VALUES (DEFAULT)
-    LOB (txn_details) STORE AS lob_txn_details_other (TABLESPACE GD_LOB_04),
-    LOB (txn_payload) STORE AS lob_txn_payload_other (TABLESPACE GD_LOB_03)
+    LOB (SMG3_LOGGING_DATA) STORE AS lob_txn_details_other (TABLESPACE GD_LOB_04),
+    LOB (FILTRATION_JSON_DATA) STORE AS lob_txn_payload_other (TABLESPACE GD_LOB_03)
 )
 (
   PARTITION p_seed VALUES LESS THAN (DATE '2025-01-01')
