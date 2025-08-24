@@ -1,15 +1,12 @@
-SELECT lsp.table_owner,
-       lsp.table_name,
-       lsp.column_name,
-       lsp.subpartition_name,
-       lsp.lob_name,
-       lsp.tablespace_name,
-       ROUND(s.bytes/1024/1024,2) AS size_mb
-FROM   dba_lob_subpartitions lsp
-JOIN   dba_segments s
-       ON s.segment_name = lsp.lob_name
-      AND s.partition_name = lsp.subpartition_name
-      AND s.tablespace_name = lsp.tablespace_name
-WHERE  lsp.table_name = 'CIM_OFM_SMG6_LOGGING'
-AND    lsp.table_owner = 'GD'
-ORDER BY lsp.column_name, lsp.subpartition_name;
+CREATE TABLESPACE my_tablespace
+DATAFILE '/u01/app/oracle/oradata/mydb/GD_LOB_TEMP_1.dbf'
+SIZE 100M
+AUTOEXTEND ON
+NEXT 10M
+MAXSIZE 500M;
+CREATE TABLESPACE my_tablespace
+DATAFILE '/u01/app/oracle/oradata/mydb/GD_LOB_TEMP_2.dbf'
+SIZE 100M
+AUTOEXTEND ON
+NEXT 10M
+MAXSIZE 500M;
