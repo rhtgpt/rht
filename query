@@ -1,55 +1,12 @@
-You can trace any inserted row to the exact (sub)partition and tablespace it landed in by grabbing its ROWID at insert time, then resolving that ROWID to the owning segment.
-
-A) For the table row (which heap subpartition & tablespace?)
--- 1) Insert and capture the rowid
-VAR rid ROWID
-INSERT INTO GD.CIM_OFM_SMG6_LOGGING
-  (TRACE_ID, ALIAS, AUDIT_CREATE_DATE, SMG3_LOGGING_DATA, FILTRATION_JSON_DATA)
-VALUES
-  (SYS_GUID(), 'ASIA', SYSTIMESTAMP, RPAD('X', 1024), RPAD('Y', 1024))
-RETURNING ROWID INTO :rid;
-
--- 2) Resolve rowid -> object/subobject (partition/subpartition) -> tablespace
-SELECT o.owner,
-       o.object_name       AS table_name,
-       o.subobject_name    AS part_or_subpart,   -- partition or SUBPARTITION name
-       s.segment_type,
-       s.tablespace_name
-FROM   dba_objects  o
-LEFT JOIN dba_segments s
-       ON s.owner = o.owner
-      AND s.segment_name = o.object_name
-      AND NVL(s.partition_name,'-') = NVL(o.subobject_name,'-')
-WHERE  o.data_object_id = DBMS_ROWID.ROWID_OBJECT(:rid);
-
-
-This tells you exactly which (sub)partition the row is in and the tablespace of that heap segment.
-
-B) For the row’s LOB columns (which LOB subpartition & tablespace?)
-
-Once you know the table subpartition name from step A (say it’s SP0_2025_08_24), map that to the LOB subpartition rows:
-
--- Replace :subp with the subpartition name from step A
-VAR subp VARCHAR2(128)
-EXEC :subp := '<<SUBPARTITION_NAME_FROM_STEP_A>>';
-
--- LOB #1
-SELECT lsp.table_owner, lsp.table_name, lsp.column_name,
-       lsp.subpartition_name, lsp.lob_name, lsp.tablespace_name
-FROM   dba_lob_subpartitions lsp
-WHERE  lsp.table_owner      = 'GD'
-  AND  lsp.table_name       = 'CIM_OFM_SMG6_LOGGING'
-  AND  lsp.column_name      = 'SMG3_LOGGING_DATA'
-  AND  lsp.subpartition_name= :subp;
-
--- LOB #2
-SELECT lsp.table_owner, lsp.table_name, lsp.column_name,
-       lsp.subpartition_name, lsp.lob_name, lsp.tablespace_name
-FROM   dba_lob_subpartitions lsp
-WHERE  lsp.table_owner      = 'GD'
-  AND  lsp.table_name       = 'CIM_OFM_SMG6_LOGGING'
-  AND  lsp.column_name      = 'FILTRATION_JSON_DATA'
-  AND  lsp.subpartition_name= :subp;
-
-
-These queries show the LOB subpartition and its tablespace (e.g., GD_LOB_05 / GD_LOB_06), i.e., where the CLOB/BLOB bytes are stored.
+WITH t AS (
+  SELECT tablespace_name, bytes FROM dba_segments s
+  WHERE s.owner = 'GD'
+    AND (s.segment_name = 'CIM_OFM_SMG6_LOGGING'
+         OR s.segment_name IN (SELECT segment_name FROM dba_lobs WHERE owner='GD' AND table_name='CIM_OFM_SMG6_LOGGING')
+         OR s.segment_name IN (SELECT index_name FROM dba_lobs WHERE owner='GD' AND table_name='CIM_OFM_SMG6_LOGGING')
+         OR s.segment_name IN (SELECT index_name FROM dba_indexes WHERE table_owner='GD' AND table_name='CIM_OFM_SMG6_LOGGING'))
+)
+SELECT tablespace_name, ROUND(SUM(bytes)/1024/1024,2) AS total_mb
+FROM t
+GROUP BY tablespace_name
+ORDER BY tablespace_name;
