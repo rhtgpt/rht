@@ -1,12 +1,5 @@
-WITH t AS (
-  SELECT tablespace_name, bytes FROM dba_segments s
-  WHERE s.owner = 'GD'
-    AND (s.segment_name = 'CIM_OFM_SMG6_LOGGING'
-         OR s.segment_name IN (SELECT segment_name FROM dba_lobs WHERE owner='GD' AND table_name='CIM_OFM_SMG6_LOGGING')
-         OR s.segment_name IN (SELECT index_name FROM dba_lobs WHERE owner='GD' AND table_name='CIM_OFM_SMG6_LOGGING')
-         OR s.segment_name IN (SELECT index_name FROM dba_indexes WHERE table_owner='GD' AND table_name='CIM_OFM_SMG6_LOGGING'))
-)
-SELECT tablespace_name, ROUND(SUM(bytes)/1024/1024,2) AS total_mb
-FROM t
-GROUP BY tablespace_name
-ORDER BY tablespace_name;
+SELECT segment_name, segment_type, tablespace_name,
+       ROUND(bytes/1024/1024,2) AS size_mb
+FROM   dba_segments
+WHERE  segment_name = 'CIM_OFM_SMG6_LOGGING'
+AND    owner = 'GD';
