@@ -1,18 +1,3 @@
-SELECT 
-    ds.owner,
-    ds.segment_name,
-    ds.segment_type,
-    ds.partition_name,
-    tp.table_name
-FROM dba_segments ds
-LEFT JOIN dba_tab_partitions tp
-       ON ds.partition_name = tp.partition_name
-      AND ds.owner = tp.table_owner
-LEFT JOIN dba_lob_partitions lp
-       ON ds.partition_name = lp.partition_name
-      AND ds.owner = lp.table_owner
-LEFT JOIN dba_ind_partitions ip
-       ON ds.partition_name = ip.partition_name
-      AND ds.owner = ip.index_owner
-WHERE ds.tablespace_name = 'YOUR_TABLESPACE_NAME'
-ORDER BY ds.owner, tp.table_name, ds.partition_name;
+SELECT table_owner, table_name, partition_name
+FROM   dba_tab_partitions
+WHERE  partition_name = 'YOUR_PARTITION_NAME';
