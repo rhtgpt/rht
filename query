@@ -1,5 +1,14 @@
-SELECT segment_name, segment_type, tablespace_name,
-       ROUND(bytes/1024/1024,2) AS size_mb
-FROM   dba_segments
-WHERE  segment_name = 'CIM_OFM_SMG6_LOGGING'
-AND    owner = 'GD';
+SELECT lp.table_owner,
+       lp.table_name,
+       lp.column_name,
+       lp.partition_name,
+       lp.lob_name,
+       lp.tablespace_name,
+       ROUND(s.bytes/1024/1024,2) AS size_mb
+FROM   dba_lob_partitions lp
+JOIN   dba_segments s
+       ON s.segment_name = lp.lob_name
+      AND s.partition_name = lp.partition_name
+      AND s.tablespace_name = lp.tablespace_name
+WHERE  lp.table_name = 'CIM_OFM_SMG6_LOGGING'
+AND    lp.table_owner = 'GD';
