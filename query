@@ -1,96 +1,21 @@
-1) What’s actually in GD_LOB_04 (top consumers)
-SELECT owner, segment_type, segment_name, partition_name,
-       ROUND(bytes/1024/1024,2) AS size_mb
-FROM   dba_segments
-WHERE  tablespace_name = 'GD_LOB_04'
-ORDER  BY bytes DESC;
-
-2) Map every LOB/LOBINDEX in GD_LOB_04 to its table & column
-
-(includes partitioned and subpartitioned cases)
-
-WITH seg AS (
-  SELECT owner, segment_name, segment_type, partition_name, bytes
-  FROM   dba_segments
-  WHERE  tablespace_name = 'GD_LOB_04'
-),
--- LOB data + LOB index (column-level)
-lob_col AS (
-  SELECT l.owner, l.table_name, l.column_name, l.segment_name AS lobseg, l.index_name AS lobix
-  FROM   dba_lobs l
-)
-SELECT 
-  s.owner,
-  lc.table_name,
-  lc.column_name,
-  s.segment_type,
-  s.segment_name,
-  s.partition_name,
-  ROUND(s.bytes/1024/1024,2) AS size_mb
-FROM seg s
-LEFT JOIN lob_col lc
-       ON (s.owner = lc.owner AND (s.segment_name = lc.lobseg OR s.segment_name = lc.lobix))
-ORDER BY size_mb DESC;
+-- (Turn on DBMS Output panel in your tool to see messages)
+EXEC GD.DROP_INTERVAL_PART_SP('CIM_OFM_SMG6_LOGGING');
 
 
-If a row shows TABLE_NAME/COLUMN_NAME → that LOB (or its LOBINDEX) belongs to that table/column.
-
-If TABLE_NAME is NULL → the segment in GD_LOB_04 is not a LOB of any table (could be some other object), or the owner/table isn’t what we expect.
-
-3) If you only care about your table
-WITH t AS (
-  SELECT 'GD' owner, 'CIM_OFM_SMG6_LOGGING' table_name FROM dual
-)
-SELECT s.owner,
-       l.table_name,
-       l.column_name,
-       s.segment_type,
-       s.segment_name,
-       s.partition_name,
-       s.tablespace_name,
-       ROUND(s.bytes/1024/1024,2) AS size_mb
-FROM   dba_lobs l
-JOIN   dba_segments s
-       ON s.owner = l.owner
-      AND s.segment_name IN (l.segment_name, l.index_name)
-JOIN   t
-       ON t.owner = l.owner AND t.table_name = l.table_name
-WHERE  s.tablespace_name = 'GD_LOB_04'
-ORDER  BY size_mb DESC;
 
 
-If this returns zero rows, then your table’s LOBs/LOBINDEXes are not in GD_LOB_04; the growth is from another object.
 
-4) Who else is using GD_LOB_04?
-SELECT NVL(l.table_name, '(not a LOB of any table)') AS table_name,
-       NVL(l.column_name, '-') AS column_name,
-       s.owner,
-       s.segment_type,
-       ROUND(SUM(s.bytes)/1024/1024,2) AS total_mb
-FROM   dba_segments s
-LEFT JOIN dba_lobs l
-       ON l.owner = s.owner
-      AND s.segment_name IN (l.segment_name, l.index_name)
-WHERE  s.tablespace_name = 'GD_LOB_04'
-GROUP  BY s.owner, s.segment_type, l.table_name, l.column_name
-ORDER  BY total_mb DESC;
-
-5) Check recyclebin (dropped stuff still holding space)
-SELECT owner, object_name, original_name, type, ts_name, space
-FROM   dba_recyclebin
-WHERE  ts_name = 'GD_LOB_04'
-ORDER  BY space DESC;
--- If safe:
--- PURGE DBA_RECYCLEBIN;
-
-6) If you suspect seed partition LOBs
-
-(when auditing dates fall into the seed range)
-
--- See LOB subpartitions + their tablespaces for your table
-SELECT lsp.table_owner, lsp.table_name, lsp.column_name,
-       lsp.subpartition_name, lsp.tablespace_name
-FROM   dba_lob_subpartitions lsp
-WHERE  lsp.table_owner = 'GD'
-  AND  lsp.table_name  = 'CIM_OFM_SMG6_LOGGING'
-ORDER  BY lsp.column_name, lsp.subpartition_name;
+BEGIN
+   FOR i IN 1..30 LOOP
+      INSERT INTO GD.CIM_OFM_SMG6_LOGGING
+        (TRACE_ID, ALIAS, AUDIT_CREATE_DATE, SMG3_LOGGING_DATA, FILTRATION_JSON_DATA)
+      VALUES
+        (SYS_GUID(),
+         CASE MOD(i,2) WHEN 0 THEN 'ASIA' ELSE 'EU' END,  -- alternate alias
+         TRUNC(SYSDATE) - i,                              -- past 30 days
+         RPAD('S', 1024, 'S'),                            -- ~1 KB CLOB
+         RPAD('F', 1024, 'F'));                           -- ~1 KB CLOB
+   END LOOP;
+   COMMIT;
+END;
+/
