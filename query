@@ -1,1 +1,1 @@
-SELECT DBMS_METADATA.GET_DDL('TABLE', 'OLD_TABLE', 'SCHEMA_NAME') FROM DUAL;
+Oracle does not allow you to directly change partitioning method (e.g., from simple RANGE to RANGE-HASH with SUBPARTITION TEMPLATE) using just ALTER TABLE.
