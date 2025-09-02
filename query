@@ -1,32 +1,71 @@
--- All constraints (PK, UK, CK, FK) on the table
-SELECT constraint_name,
-       constraint_type,   -- P=Primary, U=Unique, C=Check, R=FK
-       status,
-       search_condition,
-       r_constraint_name  -- for FKs, shows referenced constraint
-FROM   dba_constraints
-WHERE  table_name  = 'CIM_OFM_SMG3_LOGGING'
-AND    owner       = 'GD';
+DROP TABLE GD.CIM_OFM_SMG3_LOGGING_NEW;
+
+/
+CREATE TABLE "GD"."CIM_OFM_SMG3_LOGGING_NEW" (
+    TRACE_ID              VARCHAR2(36 BYTE),
+    ALIAS                 VARCHAR2(16 BYTE),
+    AUDIT_CREATE_DATE     TIMESTAMP(6) DEFAULT SYSTIMESTAMP,
+    SMG3_LOGGING_DATA     CLOB,
+    FILTRATION_JSON_DATA  CLOB
+)
+PARTITION BY RANGE (AUDIT_CREATE_DATE)
+INTERVAL (NUMTODSINTERVAL(1,'DAY'))
+SUBPARTITION BY HASH (TRACE_ID)
+SUBPARTITION TEMPLATE (
+    SUBPARTITION sp0
+      LOB (SMG3_LOGGING_DATA)    STORE AS smg3_logging_data_1 (TABLESPACE GD_LOB_05),
+      LOB (FILTRATION_JSON_DATA) STORE AS smg3_logging_data_2 (TABLESPACE GD_LOB_06),
+
+    SUBPARTITION sp1
+      LOB (SMG3_LOGGING_DATA)    STORE AS smg3_logging_data_3 (TABLESPACE GD_LOB_06),
+      LOB (FILTRATION_JSON_DATA) STORE AS smg3_logging_data_4 (TABLESPACE GD_LOB_05)
+)
+(
+    PARTITION p_seed VALUES LESS THAN (DATE '2025-01-01')
+)
+ENABLE ROW MOVEMENT;
 
 
--- All indexes on the table
-SELECT i.index_name,
-       i.uniqueness,
-       c.column_name,
-       c.column_position
-FROM   dba_indexes i
-JOIN   dba_ind_columns c
-       ON i.index_name = c.index_name
-      AND i.owner      = c.index_owner
-WHERE  i.table_name = 'CIM_OFM_SMG3_LOGGING'
-AND    i.table_owner = 'GD'
-ORDER BY i.index_name, c.column_position;
+CREATE INDEX "GD"."CIM_OFM_SMG3_LOGGING_IX1"
+  ON "GD"."CIM_OFM_SMG3_LOGGING_NEW" ("TRACE_ID", "ALIAS") REVERSE
+  PCTFREE 10 INITRANS 2 MAXTRANS 255
+  STORAGE (
+    BUFFER_POOL DEFAULT FLASH_CACHE DEFAULT CELL_FLASH_CACHE DEFAULT
+  )
+  TABLESPACE "OMIE_IDX" LOCAL
+  (PARTITION "p_seed" NOCOMPRESS
+    PCTFREE 10 INITRANS 2 MAXTRANS 255 LOGGING
+    STORAGE (
+      BUFFER_POOL DEFAULT FLASH_CACHE DEFAULT CELL_FLASH_CACHE DEFAULT
+    )
+    TABLESPACE "OMIE_IDX"
+  );
 
 
--- Privileges granted on this table
-SELECT grantee,
-       privilege,
-       grantable
-FROM   dba_tab_privs
-WHERE  table_name = 'CIM_OFM_SMG3_LOGGING'
-AND    owner      = 'GD';
+GRANT DELETE ON "GD"."CIM_OFM_SMG3_LOGGING_NEW" TO "GD_APP_ROLE";
+GRANT INSERT ON "GD"."CIM_OFM_SMG3_LOGGING_NEW" TO "GD_APP_ROLE";
+GRANT SELECT ON "GD"."CIM_OFM_SMG3_LOGGING_NEW" TO "GD_APP_ROLE";
+GRANT UPDATE ON "GD"."CIM_OFM_SMG3_LOGGING_NEW" TO "GD_APP_ROLE";
+GRANT SELECT ON "GD"."CIM_OFM_SMG3_LOGGING_NEW" TO "GD_VIEW_ROLE";
+
+
+ALTER SESSION ENABLE PARALLEL DML;
+
+-- Make the new table NOLOGGING for faster bulk load (optional)
+ALTER TABLE GD.CIM_OFM_SMG3_LOGGING_NEW NOLOGGING;
+
+INSERT /*+ APPEND PARALLEL(4) */ INTO GD.CIM_OFM_SMG3_LOGGING_NEW
+SELECT /*+ PARALLEL(4) */ 
+       TRACE_ID,
+       ALIAS,
+       AUDIT_CREATE_DATE,
+       SMG3_LOGGING_DATA,
+       FILTRATION_JSON_DATA
+FROM   GD.CIM_OFM_SMG3_LOGGING;
+
+COMMIT;
+
+-- Restore logging and parallel settings
+ALTER TABLE GD.CIM_OFM_SMG3_LOGGING_NEW LOGGING;
+ALTER SESSION DISABLE PARALLEL DML;
+
