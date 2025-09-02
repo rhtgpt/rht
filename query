@@ -1,52 +1,32 @@
--- ===== 0_generate_dependents.sql =====
--- Run in SQL*Plus/SQLcl (needs SPOOL). Adjust schema/table if needed.
+-- All constraints (PK, UK, CK, FK) on the table
+SELECT constraint_name,
+       constraint_type,   -- P=Primary, U=Unique, C=Check, R=FK
+       status,
+       search_condition,
+       r_constraint_name  -- for FKs, shows referenced constraint
+FROM   dba_constraints
+WHERE  table_name  = 'CIM_OFM_SMG3_LOGGING'
+AND    owner       = 'GD';
 
-SET LONG 1000000 LONGCHUNKSIZE 1000000 PAGESIZE 0 LINESIZE 32767 TRIMSPOOL ON FEEDBACK OFF ECHO OFF
-SPOOL cim_ofm_smg3_logging_dependents.sql
 
-DECLARE
-  h  NUMBER;
-  ddl CLOB;
+-- All indexes on the table
+SELECT i.index_name,
+       i.uniqueness,
+       c.column_name,
+       c.column_position
+FROM   dba_indexes i
+JOIN   dba_ind_columns c
+       ON i.index_name = c.index_name
+      AND i.owner      = c.index_owner
+WHERE  i.table_name = 'CIM_OFM_SMG3_LOGGING'
+AND    i.table_owner = 'GD'
+ORDER BY i.index_name, c.column_position;
 
-  PROCEDURE print(p CLOB) IS
-  BEGIN
-    IF p IS NOT NULL THEN
-      DBMS_OUTPUT.PUT_LINE(p);
-    END IF;
-  END;
-BEGIN
-  -- Configure DBMS_METADATA to include storage, tablespace, etc.
-  h := DBMS_METADATA.OPEN('TABLE');
 
-  DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM,'SQLTERMINATOR',TRUE);
-  DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM,'STORAGE',TRUE);
-  DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM,'SEGMENT_ATTRIBUTES',TRUE);
-  DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM,'TABLESPACE',TRUE);
-  DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM,'CONSTRAINTS',TRUE);
-  DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM,'REF_CONSTRAINTS',TRUE);
-
-  -- Indexes
-  ddl := DBMS_METADATA.GET_DEPENDENT_DDL('INDEX','CIM_OFM_SMG3_LOGGING','GD');
-  print(ddl);
-
-  -- Constraints (PK/UK/CK; FKs too if any point back from this table)
-  ddl := DBMS_METADATA.GET_DEPENDENT_DDL('CONSTRAINT','CIM_OFM_SMG3_LOGGING','GD');
-  print(ddl);
-
-  -- Triggers (if any)
-  ddl := DBMS_METADATA.GET_DEPENDENT_DDL('TRIGGER','CIM_OFM_SMG3_LOGGING','GD');
-  print(ddl);
-
-  -- Grants
-  ddl := DBMS_METADATA.GET_DEPENDENT_DDL('OBJECT_GRANT','CIM_OFM_SMG3_LOGGING','GD');
-  print(ddl);
-
-  -- Comments (table & columns)
-  ddl := DBMS_METADATA.GET_DEPENDENT_DDL('COMMENT','CIM_OFM_SMG3_LOGGING','GD');
-  print(ddl);
-
-  DBMS_METADATA.CLOSE(h);
-END;
-/
-SPOOL OFF
-SET FEEDBACK ON
+-- Privileges granted on this table
+SELECT grantee,
+       privilege,
+       grantable
+FROM   dba_tab_privs
+WHERE  table_name = 'CIM_OFM_SMG3_LOGGING'
+AND    owner      = 'GD';
