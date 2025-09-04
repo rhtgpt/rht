@@ -1,1 +1,13 @@
-ALTER SESSION ENABLE PARALLEL DML;
+SET TIMING OFF               -- we’ll use named TIMING blocks
+COLUMN now_ts NEW_VALUE v_now_ts
+SELECT TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM') AS now_ts FROM dual;
+
+
+
+
+TIMING START T_CREATE
+
+
+
+TIMING STOP  T_CREATE
+PROMPT -----------------------------------------------------------
