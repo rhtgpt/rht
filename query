@@ -1,13 +1,6 @@
-SET TIMING OFF               -- we’ll use named TIMING blocks
-COLUMN now_ts NEW_VALUE v_now_ts
-SELECT TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM') AS now_ts FROM dual;
+COLUMN end_ts NEW_VALUE v_end_ts
+SELECT TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM') AS end_ts FROM dual;
 
-
-
-
-TIMING START T_CREATE
-
-
-
-TIMING STOP  T_CREATE
-PROMPT -----------------------------------------------------------
+PROMPT ===========================================================
+PROMPT Script end: &v_end_ts
+PROMPT ===========================================================
