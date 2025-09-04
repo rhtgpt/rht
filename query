@@ -1,152 +1,18 @@
--- Make sure output shows up
-SET SERVEROUTPUT ON SIZE UNLIMITED
-SET ECHO ON
-SET FEEDBACK ON
-SET LINESIZE 500
-SET DEFINE OFF
-
-/* ========= helper: pretty elapsed printer ========= */
--- Start a phase: call start_<PHASE>
-VAR t_create TIMESTAMP
-VAR t_grants TIMESTAMP
-VAR t_copy   TIMESTAMP
-VAR t_stats  TIMESTAMP
-VAR t_swap   TIMESTAMP
-
-/* ======== PHASE 1: CREATE ======== */
+PROMPT ================================
+PROMPT Script starting at:
 BEGIN
-  :t_create := SYSTIMESTAMP;
-  DBMS_OUTPUT.PUT_LINE('CREATE start: '||
-    TO_CHAR(:t_create,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
+  DBMS_OUTPUT.PUT_LINE(TO_CHAR(SYSTIMESTAMP,
+    'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
 END;
 /
+PROMPT ================================
 
--- <<< your CREATE TABLE / INDEX statements here >>>
 
-DECLARE
-  d INTERVAL DAY TO SECOND := SYSTIMESTAMP - :t_create;
+ROMPT ================================
+PROMPT Script ending at:
 BEGIN
-  DBMS_OUTPUT.PUT_LINE('CREATE end:   '||
-    TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
-  DBMS_OUTPUT.PUT_LINE('CREATE elapsed: '||
-    EXTRACT(DAY FROM d)||'d '||
-    LPAD(EXTRACT(HOUR   FROM d),2,'0')||':'||
-    LPAD(EXTRACT(MINUTE FROM d),2,'0')||':'||
-    TO_CHAR(EXTRACT(SECOND FROM d),'FM00DFF3'));
+  DBMS_OUTPUT.PUT_LINE(TO_CHAR(SYSTIMESTAMP,
+    'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
 END;
 /
--- ---------------------------------------------------
-
-/* ======== PHASE 2: GRANTS ======== */
-BEGIN
-  :t_grants := SYSTIMESTAMP;
-  DBMS_OUTPUT.PUT_LINE('GRANTS start: '||
-    TO_CHAR(:t_grants,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
-END;
-/
-
--- <<< your GRANT statements here >>>
-
-DECLARE
-  d INTERVAL DAY TO SECOND := SYSTIMESTAMP - :t_grants;
-BEGIN
-  DBMS_OUTPUT.PUT_LINE('GRANTS end:   '||
-    TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
-  DBMS_OUTPUT.PUT_LINE('GRANTS elapsed: '||
-    EXTRACT(DAY FROM d)||'d '||
-    LPAD(EXTRACT(HOUR   FROM d),2,'0')||':'||
-    LPAD(EXTRACT(MINUTE FROM d),2,'0')||':'||
-    TO_CHAR(EXTRACT(SECOND FROM d),'FM00DFF3'));
-END;
-/
--- ---------------------------------------------------
-
-/* ======== PHASE 3: COPY ======== */
-BEGIN
-  :t_copy := SYSTIMESTAMP;
-  DBMS_OUTPUT.PUT_LINE('COPY start:   '||
-    TO_CHAR(:t_copy,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
-END;
-/
-
-ALTER SESSION ENABLE PARALLEL DML;
-ALTER TABLE GD.CIM_OFM_SMG3_LOGGING_NEW NOLOGGING;
-
-INSERT /*+ APPEND PARALLEL(GD.CIM_OFM_SMG3_LOGGING_NEW,32) */
-INTO GD.CIM_OFM_SMG3_LOGGING_NEW
-(TRACE_ID, ALIAS, AUDIT_CREATE_DATE, SMG3_LOGGING_DATA, FILTRATION_JSON_DATA)
-SELECT /*+ PARALLEL(s,32) */
-       s.TRACE_ID, s.ALIAS, s.AUDIT_CREATE_DATE,
-       s.SMG3_LOGGING_DATA, s.FILTRATION_JSON_DATA
-FROM GD.CIM_OFM_SMG3_LOGGING s;
-
-COMMIT;
-ALTER TABLE GD.CIM_OFM_SMG3_LOGGING_NEW LOGGING;
-
-DECLARE
-  d INTERVAL DAY TO SECOND := SYSTIMESTAMP - :t_copy;
-BEGIN
-  DBMS_OUTPUT.PUT_LINE('COPY end:     '||
-    TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
-  DBMS_OUTPUT.PUT_LINE('COPY elapsed: '||
-    EXTRACT(DAY FROM d)||'d '||
-    LPAD(EXTRACT(HOUR   FROM d),2,'0')||':'||
-    LPAD(EXTRACT(MINUTE FROM d),2,'0')||':'||
-    TO_CHAR(EXTRACT(SECOND FROM d),'FM00DFF3'));
-END;
-/
--- ---------------------------------------------------
-
-/* ======== PHASE 4: STATS (optional) ======== */
-BEGIN
-  :t_stats := SYSTIMESTAMP;
-  DBMS_OUTPUT.PUT_LINE('STATS start:  '||
-    TO_CHAR(:t_stats,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
-END;
-/
-
-BEGIN
-  DBMS_STATS.GATHER_TABLE_STATS(
-    ownname=>'GD', tabname=>'CIM_OFM_SMG3_LOGGING_NEW',
-    degree=>32, cascade=>TRUE, no_invalidate=>FALSE
-  );
-END;
-/
-
-DECLARE
-  d INTERVAL DAY TO SECOND := SYSTIMESTAMP - :t_stats;
-BEGIN
-  DBMS_OUTPUT.PUT_LINE('STATS end:    '||
-    TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
-  DBMS_OUTPUT.PUT_LINE('STATS elapsed: '||
-    EXTRACT(DAY FROM d)||'d '||
-    LPAD(EXTRACT(HOUR   FROM d),2,'0')||':'||
-    LPAD(EXTRACT(MINUTE FROM d),2,'0')||':'||
-    TO_CHAR(EXTRACT(SECOND FROM d),'FM00DFF3'));
-END;
-/
--- ---------------------------------------------------
-
-/* ======== PHASE 5: SWAP ======== */
-BEGIN
-  :t_swap := SYSTIMESTAMP;
-  DBMS_OUTPUT.PUT_LINE('SWAP start:   '||
-    TO_CHAR(:t_swap,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
-END;
-/
-
-ALTER TABLE GD.CIM_OFM_SMG3_LOGGING     RENAME TO CIM_OFM_SMG3_LOGGING_OLD;
-ALTER TABLE GD.CIM_OFM_SMG3_LOGGING_NEW RENAME TO CIM_OFM_SMG3_LOGGING;
-
-DECLARE
-  d INTERVAL DAY TO SECOND := SYSTIMESTAMP - :t_swap;
-BEGIN
-  DBMS_OUTPUT.PUT_LINE('SWAP end:     '||
-    TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
-  DBMS_OUTPUT.PUT_LINE('SWAP elapsed: '||
-    EXTRACT(DAY FROM d)||'d '||
-    LPAD(EXTRACT(HOUR   FROM d),2,'0')||':'||
-    LPAD(EXTRACT(MINUTE FROM d),2,'0')||':'||
-    TO_CHAR(EXTRACT(SECOND FROM d),'FM00DFF3'));
-END;
-/
+PROMPT ================================
