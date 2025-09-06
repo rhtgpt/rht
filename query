@@ -1,18 +1,16 @@
-PROMPT ================================
-PROMPT Script starting at:
-BEGIN
-  DBMS_OUTPUT.PUT_LINE(TO_CHAR(SYSTIMESTAMP,
-    'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
-END;
-/
-PROMPT ================================
+"LOB_DATA" CLOB
+was defined without a specific LOB storage clause like:
 
+sql
+Copy code
+LOB ("LOB_DATA") STORE AS ... TABLESPACE ...
+That means Oracle will place the LOB segment according to default rules:
 
-ROMPT ================================
-PROMPT Script ending at:
-BEGIN
-  DBMS_OUTPUT.PUT_LINE(TO_CHAR(SYSTIMESTAMP,
-    'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
-END;
-/
-PROMPT ================================
+Same tablespace as the table (here OMIE_DATA_01), unless an explicit LOB clause overrides it.
+
+It will be stored as a BASICFILE LOB by default (if not configured for SECUREFILE at DB level).
+
+Attributes like ENABLE STORAGE IN ROW, CHUNK, RETENTION, etc., also use defaults unless specified.
+
+✅ Answer
+LOB_DATA will be stored in the table’s tablespace OMIE_DATA_01, because no separate LOB storage clause was given.
