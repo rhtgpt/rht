@@ -1,6 +1,28 @@
-------------------------------------------------------------
--- Table Definition (with STORE IN and simplified LOB storage)
-------------------------------------------------------------
+-- =========================================================
+-- CIM_DART_NC_RECORD -> build NEW, load, and swap
+-- =========================================================
+SET SERVEROUTPUT ON SIZE UNLIMITED
+SET ECHO ON
+SET FEEDBACK ON
+SET DEFINE OFF
+SET LINESIZE 500
+
+PROMPT ===============================================
+PROMPT Script START:
+BEGIN
+  DBMS_OUTPUT.PUT_LINE(TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
+END;
+/
+PROMPT ===============================================
+
+-- Force parallel for speed (adjust degree as needed)
+ALTER SESSION FORCE PARALLEL DDL PARALLEL 32;
+ALTER SESSION FORCE PARALLEL QUERY PARALLEL 32;
+ALTER SESSION FORCE PARALLEL DML PARALLEL 32;
+
+-- =========================================================
+-- 1) CREATE TABLE (SMG3-style) + STORE IN + HASH SUBPARTS
+-- =========================================================
 CREATE TABLE GD.CIM_DART_NC_RECORD_NEW
 (
   TRACE_ID            VARCHAR2(36 BYTE),
@@ -36,13 +58,17 @@ SUBPARTITION TEMPLATE
 ENABLE ROW MOVEMENT
 LOGGING;
 
-------------------------------------------------------------
--- Constraints / Indexes
-------------------------------------------------------------
+-- =========================================================
+-- 2) CONSTRAINT + INDEXES (LOCAL; names suffixed _NEW)
+-- =========================================================
+CREATE UNIQUE INDEX GD.CIM_DART_NC_RECORD_PK_NEW
+  ON GD.CIM_DART_NC_RECORD_NEW (TRACE_ID, AUDIT_CREATE_DATE)
+  TABLESPACE OMIE_IDX LOCAL;
+
 ALTER TABLE GD.CIM_DART_NC_RECORD_NEW
   ADD CONSTRAINT CIM_DART_NC_RECORD_PK_NEW
   PRIMARY KEY (TRACE_ID, AUDIT_CREATE_DATE)
-  USING INDEX TABLESPACE OMIE_IDX
+  USING INDEX GD.CIM_DART_NC_RECORD_PK_NEW
   ENABLE;
 
 CREATE INDEX GD.CIM_DART_NC_RECORD_IDX1_NEW
@@ -61,11 +87,44 @@ CREATE INDEX GD.CIM_DART_NC_RECORD_IDX5_NEW
   ON GD.CIM_DART_NC_RECORD_NEW (PTY_ID)
   TABLESPACE OMIE_IDX LOCAL;
 
-------------------------------------------------------------
--- Grants
-------------------------------------------------------------
+-- (optional) grants
 GRANT DELETE ON GD.CIM_DART_NC_RECORD_NEW TO GD_APP_ROLE;
 GRANT INSERT ON GD.CIM_DART_NC_RECORD_NEW TO GD_APP_ROLE;
 GRANT SELECT ON GD.CIM_DART_NC_RECORD_NEW TO GD_APP_ROLE;
 GRANT UPDATE ON GD.CIM_DART_NC_RECORD_NEW TO GD_APP_ROLE;
 GRANT SELECT ON GD.CIM_DART_NC_RECORD_NEW TO GD_VIEW_ROLE;
+
+-- =========================================================
+-- 3) PARALLEL BULK COPY FROM EXISTING TABLE
+-- =========================================================
+ALTER SESSION ENABLE PARALLEL DML;
+
+INSERT /*+ APPEND PARALLEL(GD.CIM_DART_NC_RECORD_NEW,32) */
+INTO GD.CIM_DART_NC_RECORD_NEW
+(TRACE_ID, AUDIT_CREATE_DATE, SSN, NC_TXN_ID, BIS_SEG_CD,
+ PTY_ID, LOB_DATA, COMPONENT, CASE_NUMBER, FIRST_NM, LAST_NM, CD, SERVER_INSTANCE)
+SELECT /*+ PARALLEL(s,32) */
+       s.TRACE_ID, s.AUDIT_CREATE_DATE, s.SSN, s.NC_TXN_ID, s.BIS_SEG_CD,
+       s.PTY_ID, s.LOB_DATA, s.COMPONENT, s.CASE_NUMBER, s.FIRST_NM, s.LAST_NM, s.CD, s.SERVER_INSTANCE
+FROM   GD.CIM_DART_NC_RECORD s;
+
+COMMIT;
+
+-- =========================================================
+-- 4) SWAP: simple rename (old -> backup, new -> live)
+-- =========================================================
+ALTER TABLE GD.CIM_DART_NC_RECORD RENAME TO CIM_DART_NC_RECORD_OLD;
+ALTER TABLE GD.CIM_DART_NC_RECORD_NEW RENAME TO CIM_DART_NC_RECORD;
+
+-- Reset session parallel flags
+ALTER SESSION DISABLE PARALLEL DDL;
+ALTER SESSION DISABLE PARALLEL QUERY;
+ALTER SESSION DISABLE PARALLEL DML;
+
+PROMPT ===============================================
+PROMPT Script FINISH:
+BEGIN
+  DBMS_OUTPUT.PUT_LINE(TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
+END;
+/
+PROMPT ===============================================
