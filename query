@@ -1,16 +1,71 @@
-"LOB_DATA" CLOB
-was defined without a specific LOB storage clause like:
+------------------------------------------------------------
+-- Table Definition (with STORE IN and simplified LOB storage)
+------------------------------------------------------------
+CREATE TABLE GD.CIM_DART_NC_RECORD_NEW
+(
+  TRACE_ID            VARCHAR2(36 BYTE),
+  AUDIT_CREATE_DATE   TIMESTAMP(6) DEFAULT SYSTIMESTAMP,
+  SSN                 VARCHAR2(9 BYTE),
+  NC_TXN_ID           VARCHAR2(32 BYTE),
+  BIS_SEG_CD          VARCHAR2(2 BYTE),
+  PTY_ID              VARCHAR2(11 BYTE),
+  LOB_DATA            CLOB,
+  COMPONENT           VARCHAR2(10 BYTE),
+  CASE_NUMBER         VARCHAR2(300 BYTE),
+  FIRST_NM            VARCHAR2(30 BYTE),
+  LAST_NM             VARCHAR2(30 BYTE),
+  CD                  VARCHAR2(3 BYTE),
+  SERVER_INSTANCE     VARCHAR2(12 BYTE)
+)
+PARTITION BY RANGE (AUDIT_CREATE_DATE)
+  INTERVAL (NUMTODSINTERVAL(1,'DAY'))
+  STORE IN (OMIE_DATA_01, OMIE_DATA_02, OMIE_DATA_03,
+            OMIE_DATA_04, OMIE_DATA_05, OMIE_DATA_06, OMIE_DATA_07)
+SUBPARTITION BY HASH (TRACE_ID)
+SUBPARTITION TEMPLATE
+(
+  SUBPARTITION sp0
+    LOB (LOB_DATA) STORE AS dart_nc_lob_sp0 (TABLESPACE OMIE_LOB_03),
 
-sql
-Copy code
-LOB ("LOB_DATA") STORE AS ... TABLESPACE ...
-That means Oracle will place the LOB segment according to default rules:
+  SUBPARTITION sp1
+    LOB (LOB_DATA) STORE AS dart_nc_lob_sp1 (TABLESPACE OMIE_LOB_04)
+)
+(
+  PARTITION p_seed VALUES LESS THAN (TIMESTAMP '2020-09-15 00:00:00')
+)
+ENABLE ROW MOVEMENT
+LOGGING;
 
-Same tablespace as the table (here OMIE_DATA_01), unless an explicit LOB clause overrides it.
+------------------------------------------------------------
+-- Constraints / Indexes
+------------------------------------------------------------
+ALTER TABLE GD.CIM_DART_NC_RECORD_NEW
+  ADD CONSTRAINT CIM_DART_NC_RECORD_PK_NEW
+  PRIMARY KEY (TRACE_ID, AUDIT_CREATE_DATE)
+  USING INDEX TABLESPACE OMIE_IDX
+  ENABLE;
 
-It will be stored as a BASICFILE LOB by default (if not configured for SECUREFILE at DB level).
+CREATE INDEX GD.CIM_DART_NC_RECORD_IDX1_NEW
+  ON GD.CIM_DART_NC_RECORD_NEW (AUDIT_CREATE_DATE)
+  TABLESPACE OMIE_IDX LOCAL;
 
-Attributes like ENABLE STORAGE IN ROW, CHUNK, RETENTION, etc., also use defaults unless specified.
+CREATE INDEX GD.CIM_DART_NC_RECORD_IDX2_NEW
+  ON GD.CIM_DART_NC_RECORD_NEW (SSN)
+  TABLESPACE OMIE_IDX LOCAL;
 
-✅ Answer
-LOB_DATA will be stored in the table’s tablespace OMIE_DATA_01, because no separate LOB storage clause was given.
+CREATE INDEX GD.CIM_DART_NC_RECORD_IDX3_NEW
+  ON GD.CIM_DART_NC_RECORD_NEW (NC_TXN_ID)
+  TABLESPACE OMIE_IDX LOCAL;
+
+CREATE INDEX GD.CIM_DART_NC_RECORD_IDX5_NEW
+  ON GD.CIM_DART_NC_RECORD_NEW (PTY_ID)
+  TABLESPACE OMIE_IDX LOCAL;
+
+------------------------------------------------------------
+-- Grants
+------------------------------------------------------------
+GRANT DELETE ON GD.CIM_DART_NC_RECORD_NEW TO GD_APP_ROLE;
+GRANT INSERT ON GD.CIM_DART_NC_RECORD_NEW TO GD_APP_ROLE;
+GRANT SELECT ON GD.CIM_DART_NC_RECORD_NEW TO GD_APP_ROLE;
+GRANT UPDATE ON GD.CIM_DART_NC_RECORD_NEW TO GD_APP_ROLE;
+GRANT SELECT ON GD.CIM_DART_NC_RECORD_NEW TO GD_VIEW_ROLE;
