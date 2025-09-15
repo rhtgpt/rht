@@ -1,8 +1,21 @@
-Subject: Confirmation on GD_LOB_03 and GD_LOB_04 Usage
+PROMPT ===============================================================
+PROMPT Starting 60_backout_swap.sql at:
+BEGIN
+  DBMS_OUTPUT.PUT_LINE('Backout started at ' || TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
+END;
+/
+PROMPT ===============================================================
 
-Hi [Name],
+-- Rename current prod to backup
+ALTER TABLE GD.CIM_OFM_SMG3_LOGGING RENAME TO CIM_OFM_SMG3_LOGGING_NEW_BACKUP;
 
-Based on my analysis in PORD, I found that only one table is currently using the tablespaces GD_LOB_03 and GD_LOB_04. Could you please confirm if my understanding is correct?
+-- Restore OLD table as prod
+ALTER TABLE GD.CIM_OFM_SMG3_LOGGING_OLD RENAME TO CIM_OFM_SMG3_LOGGING;
 
-Thanks,
-[Your Name]
+PROMPT ===============================================================
+PROMPT Backout completed successfully at:
+BEGIN
+  DBMS_OUTPUT.PUT_LINE('Backout finished at ' || TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
+END;
+/
+PROMPT ===============================================================
