@@ -1,48 +1,24 @@
-PROMPT ===============================================================
-PROMPT Starting 10_create_table.sql at:
+DECLARE
+  v_size1 NUMBER;
+  v_size2 NUMBER;
 BEGIN
-  DBMS_OUTPUT.PUT_LINE('Started at ' ||
-                       TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
+  FOR i IN 1..30 LOOP
+    -- generate random size between 50MB and 100MB for both LOBs
+    v_size1 := TRUNC(DBMS_RANDOM.VALUE(52428800, 104857600));
+    v_size2 := TRUNC(DBMS_RANDOM.VALUE(52428800, 104857600));
+
+    INSERT INTO GD.CIM_OFM_SMG3_LOGGING
+      (TRACE_ID, ALIAS, AUDIT_CREATE_DATE, SMG3_LOGGING_DATA, FILTRATION_JSON_DATA)
+    VALUES
+      (
+        SYS_GUID(),
+        CASE MOD(i, 2) WHEN 0 THEN 'ASIA' ELSE 'EU' END,  -- alternate alias
+        TRUNC(SYSDATE) - i,                               -- past 30 days
+        RPAD('S', v_size1, 'S'),                          -- random 50–100 MB
+        RPAD('F', v_size2, 'F')                           -- random 50–100 MB
+      );
+  END LOOP;
+
+  COMMIT;
 END;
 /
-PROMPT ===============================================================
-
-
--- =====================================================================
--- CREATE TABLE
--- =====================================================================
-CREATE TABLE "GD"."CIM_OFM_SMG3_LOGGING_NEW"
-(
-  TRACE_ID              VARCHAR2(36 BYTE),
-  ALIAS                 VARCHAR2(16 BYTE),
-  AUDIT_CREATE_DATE     TIMESTAMP(6) DEFAULT SYSTIMESTAMP,
-  SMG3_LOGGING_DATA     CLOB,
-  FILTRATION_JSON_DATA  CLOB
-)
-PARTITION BY RANGE (AUDIT_CREATE_DATE)
-  INTERVAL (NUMTODSINTERVAL(1,'DAY'))
-SUBPARTITION BY HASH (TRACE_ID)
-SUBPARTITION TEMPLATE
-(
-  SUBPARTITION sp0
-    LOB (SMG3_LOGGING_DATA)     STORE AS smg3_logging_data_1 (TABLESPACE GD_LOB_03),
-    LOB (FILTRATION_JSON_DATA)  STORE AS smg3_logging_data_2 (TABLESPACE GD_LOB_04),
-
-  SUBPARTITION sp1
-    LOB (SMG3_LOGGING_DATA)     STORE AS smg3_logging_data_3 (TABLESPACE GD_LOB_04),
-    LOB (FILTRATION_JSON_DATA)  STORE AS smg3_logging_data_4 (TABLESPACE GD_LOB_03)
-)
-(
-  PARTITION p_seed VALUES LESS THAN (DATE '2025-01-01')
-)
-ENABLE ROW MOVEMENT;
-
-
-PROMPT ===============================================================
-PROMPT Ending 10_create_table.sql at:
-BEGIN
-  DBMS_OUTPUT.PUT_LINE('Finished at ' ||
-                       TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM'));
-END;
-/
-PROMPT ===============================================================
