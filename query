@@ -1,24 +1,32 @@
-DECLARE
-  v_size1 NUMBER;
-  v_size2 NUMBER;
-BEGIN
-  FOR i IN 1..30 LOOP
-    -- simulate random by using MOD on unique session values
-    v_size1 := 52428800 + MOD(DBMS_UTILITY.GET_TIME * i, 52428800);
-    v_size2 := 52428800 + MOD(DBMS_UTILITY.GET_TIME * (i+5), 52428800);
+SET PAGESIZE 0 FEEDBACK OFF VERIFY OFF HEADING OFF
+SET SERVEROUTPUT ON SIZE UNLIMITED
+SET TERMOUT ON
 
-    INSERT INTO GD.CIM_OFM_SMG3_LOGGING
-      (TRACE_ID, ALIAS, AUDIT_CREATE_DATE, SMG3_LOGGING_DATA, FILTRATION_JSON_DATA)
-    VALUES
-      (
-        SYS_GUID(),
-        CASE MOD(i, 2) WHEN 0 THEN 'ASIA' ELSE 'EU' END,
-        TRUNC(SYSDATE) - i,
-        RPAD('S', v_size1, 'S'),
-        RPAD('F', v_size2, 'F')
-      );
-  END LOOP;
+-- capture START timestamp (as text we can reuse later)
+COLUMN TS_START_TZ NEW_VALUE TS_START_TZ
+SELECT TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM') TS_START_TZ FROM dual;
 
-  COMMIT;
-END;
-/
+
+
+
+
+===========================================
+
+
+
+COLUMN TS_END_TZ NEW_VALUE TS_END_TZ
+SELECT TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM') TS_END_TZ FROM dual;
+
+
+========================================
+
+
+
+-- compute ELAPSED time (as INTERVAL DAY TO SECOND) and print it
+COLUMN ELAPSED NEW_VALUE ELAPSED
+SELECT ( TO_TIMESTAMP_TZ('&TS_END_TZ','YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM')
+       - TO_TIMESTAMP_TZ('&TS_START_TZ','YYYY-MM-DD HH24:MI:SS.FF3 TZH:TZM') ) AS ELAPSED
+FROM dual;
+
+PROMPT Time taken: &ELAPSED
+PROMPT ===============================================================
