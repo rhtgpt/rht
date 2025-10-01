@@ -1,11 +1,17 @@
-Hi [DBA Team],
+Hi Swapan,
 
-As part of the migration activity for GD.CIM_OFM_SMG3_LOGGING_NEW, we need to ensure statistics are collected on the new table before renaming it.
+Thanks for pointing this out. I’ve now updated the table definition. Key changes made:
 
-I request your help to:
+ALIAS column size corrected to match PROD (VARCHAR2(8 BYTE)).
 
-Create a stored procedure under the GD schema that performs runstats (gather table statistics) on a given table.
+Seed partition updated as per PROD definition.
 
-Execute this runstats procedure on GD.CIM_OFM_SMG3_LOGGING_NEW after the initial data load is completed, but prior to the table rename.
+Added COMPRESS, TABLESPACE, PCTFREE, INITRANS, MAXTRANS, and STORAGE clauses consistent with PROD.
 
-This will ensure query performance and optimizer accuracy after the migration.
+Index definition adjusted to include REVERSE and match PROD standards.
+
+This ensures our new table is consistent with the production structure.
+
+Please review and let me know if any further adjustments are needed.
+
+Thanks & Regards,
