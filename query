@@ -1,17 +1,9 @@
-Hi Swapan,
+Regarding point #3 on creating a catch-up script to select all new rows and sync them to the new table, I would like to request some clarification.
 
-Thanks for pointing this out. I’ve now updated the table definition. Key changes made:
+Since I do not have prior experience in implementing such scripts, could you please provide more details on:
 
-ALIAS column size corrected to match PROD (VARCHAR2(8 BYTE)).
+The exact criteria we should use to identify “new rows” (e.g., based on AUDIT_CREATE_DATE, last processed timestamp, or another column).
 
-Seed partition updated as per PROD definition.
+Whether this catch-up process should be a one-time batch load after the initial migration or a recurring/scheduled job.
 
-Added COMPRESS, TABLESPACE, PCTFREE, INITRANS, MAXTRANS, and STORAGE clauses consistent with PROD.
-
-Index definition adjusted to include REVERSE and match PROD standards.
-
-This ensures our new table is consistent with the production structure.
-
-Please review and let me know if any further adjustments are needed.
-
-Thanks & Regards,
+If you have a sample script or existing approach that I can follow as a reference.
