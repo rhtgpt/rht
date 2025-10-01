@@ -1,9 +1,11 @@
-ALTER SESSION FORCE PARALLEL DDL   PARALLEL 32;
-ALTER SESSION FORCE PARALLEL QUERY PARALLEL 32;
-ALTER SESSION FORCE PARALLEL DML   PARALLEL 32;
+Hi [DBA Team],
 
+As part of the migration activity for GD.CIM_OFM_SMG3_LOGGING_NEW, we need to ensure statistics are collected on the new table before renaming it.
 
+I request your help to:
 
-ALTER SESSION DISABLE PARALLEL DDL;
-ALTER SESSION DISABLE PARALLEL QUERY;
-ALTER SESSION DISABLE PARALLEL DML;
+Create a stored procedure under the GD schema that performs runstats (gather table statistics) on a given table.
+
+Execute this runstats procedure on GD.CIM_OFM_SMG3_LOGGING_NEW after the initial data load is completed, but prior to the table rename.
+
+This will ensure query performance and optimizer accuracy after the migration.
