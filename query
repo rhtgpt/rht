@@ -1,60 +1,26 @@
 DECLARE
-  v_size1 PLS_INTEGER;
-  v_size2 PLS_INTEGER;
-
-  -- helper: create a BLOB of length p_len filled with byte of p_char
-  FUNCTION make_blob(p_len PLS_INTEGER, p_char CHAR) RETURN BLOB IS
-    l_blob       BLOB;
-    l_chunk      RAW(32767);
-    l_chunk_len  PLS_INTEGER := 32767;
-    l_written    PLS_INTEGER := 0;
-  BEGIN
-    DBMS_LOB.CREATETEMPORARY(l_blob, TRUE); -- temporary, logged
-    -- build one RAW chunk (e.g., 32767 bytes of 'S' or 'F')
-    l_chunk := UTL_RAW.CAST_TO_RAW(RPAD(p_char, l_chunk_len, p_char));
-
-    -- append full chunks
-    WHILE l_written + l_chunk_len <= p_len LOOP
-      DBMS_LOB.WRITEAPPEND(l_blob, l_chunk_len, l_chunk);
-      l_written := l_written + l_chunk_len;
-    END LOOP;
-
-    -- append remainder
-    IF l_written < p_len THEN
-      DBMS_LOB.WRITEAPPEND(
-        l_blob,
-        p_len - l_written,
-        UTL_RAW.CAST_TO_RAW(RPAD(p_char, p_len - l_written, p_char))
-      );
-    END IF;
-
-    RETURN l_blob;
-  END make_blob;
-
-  l_blob1 BLOB;
-  l_blob2 BLOB;
+  v_blob1  BLOB;
+  v_blob2  BLOB;
 BEGIN
-  FOR i IN 1 .. 600 LOOP
-    -- simulate varying sizes (~50MB baseline + jitter)
-    v_size1 := 52428800 + MOD(DBMS_UTILITY.GET_TIME * i,      52428800);
-    v_size2 := 52428800 + MOD(DBMS_UTILITY.GET_TIME * (i + 5), 52428800);
+  FOR i IN 1 .. 100 LOOP   -- insert 100 sample rows
+    -- create small sample blob data
+    DBMS_LOB.CREATETEMPORARY(v_blob1, TRUE);
+    DBMS_LOB.CREATETEMPORARY(v_blob2, TRUE);
 
-    -- build the two BLOBs
-    l_blob1 := make_blob(v_size1, 'S');  -- SMG3_LOGGING_DATA
-    l_blob2 := make_blob(v_size2, 'F');  -- FILTRATION_JSON_DATA
+    DBMS_LOB.WRITEAPPEND(v_blob1, LENGTH('SMG3_DATA_SAMPLE'), UTL_RAW.CAST_TO_RAW('SMG3_DATA_SAMPLE'));
+    DBMS_LOB.WRITEAPPEND(v_blob2, LENGTH('FILTER_JSON_SAMPLE'), UTL_RAW.CAST_TO_RAW('FILTER_JSON_SAMPLE'));
 
     INSERT INTO GD.CIM_OFM_SMG3_LOGGING
       (TRACE_ID, ALIAS, AUDIT_CREATE_DATE, SMG3_LOGGING_DATA, FILTRATION_JSON_DATA)
     VALUES
       (SYS_GUID(),
-       CASE MOD(i, 2) WHEN 0 THEN 'ASIA' ELSE 'EU' END,
-       SYSTIMESTAMP,       -- keep hours/minutes/seconds
-       l_blob1,
-       l_blob2);
+       CASE MOD(i,2) WHEN 0 THEN 'ASIA' ELSE 'EU' END,
+       SYSTIMESTAMP,        -- keeps full date+time
+       v_blob1,
+       v_blob2);
 
-    -- free the temps each iteration
-    DBMS_LOB.FREETEMPORARY(l_blob1);
-    DBMS_LOB.FREETEMPORARY(l_blob2);
+    DBMS_LOB.FREETEMPORARY(v_blob1);
+    DBMS_LOB.FREETEMPORARY(v_blob2);
   END LOOP;
 
   COMMIT;
