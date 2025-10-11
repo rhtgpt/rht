@@ -1,23 +1,62 @@
-PROMPT *** CUTOVER: pause application writes now ***
 DECLARE
-  v_max_new_ts  TIMESTAMP(6);
-BEGIN
-  SELECT NVL(MAX(AUDIT_CREATE_DATE), TIMESTAMP'1900-01-01 00:00:00')
-    INTO v_max_new_ts
-  FROM GD.CIM_NC_DART_LOGGING_NEW;
+  v_size1 PLS_INTEGER;
+  v_size2 PLS_INTEGER;
 
-  INSERT /*+ APPEND PARALLEL(GD.CIM_NC_DART_LOGGING_NEW,32) */
-  INTO GD.CIM_NC_DART_LOGGING_NEW
-    (TRACE_ID, AUDIT_CREATE_DATE, NC_REQUEST_DATA, NC_RESPONSE_DATA)
-  SELECT /*+ PARALLEL(s,32) */
-         s.TRACE_ID, s.AUDIT_CREATE_DATE, s.NC_REQUEST_DATA, s.NC_RESPONSE_DATA
-  FROM   GD.CIM_NC_DART_LOGGING s
-  WHERE  s.AUDIT_CREATE_DATE > v_max_new_ts
-    AND  NOT EXISTS (
-           SELECT 1
-           FROM GD.CIM_NC_DART_LOGGING_NEW n
-           WHERE n.TRACE_ID = s.TRACE_ID
-             AND n.AUDIT_CREATE_DATE = s.AUDIT_CREATE_DATE
-         );
+  -- helper: create a BLOB of length p_len filled with byte of p_char
+  FUNCTION make_blob(p_len PLS_INTEGER, p_char CHAR) RETURN BLOB IS
+    l_blob       BLOB;
+    l_chunk      RAW(32767);
+    l_chunk_len  PLS_INTEGER := 32767;
+    l_written    PLS_INTEGER := 0;
+  BEGIN
+    DBMS_LOB.CREATETEMPORARY(l_blob, TRUE); -- temporary, logged
+    -- build one RAW chunk (e.g., 32767 bytes of 'S' or 'F')
+    l_chunk := UTL_RAW.CAST_TO_RAW(RPAD(p_char, l_chunk_len, p_char));
+
+    -- append full chunks
+    WHILE l_written + l_chunk_len <= p_len LOOP
+      DBMS_LOB.WRITEAPPEND(l_blob, l_chunk_len, l_chunk);
+      l_written := l_written + l_chunk_len;
+    END LOOP;
+
+    -- append remainder
+    IF l_written < p_len THEN
+      DBMS_LOB.WRITEAPPEND(
+        l_blob,
+        p_len - l_written,
+        UTL_RAW.CAST_TO_RAW(RPAD(p_char, p_len - l_written, p_char))
+      );
+    END IF;
+
+    RETURN l_blob;
+  END make_blob;
+
+  l_blob1 BLOB;
+  l_blob2 BLOB;
+BEGIN
+  FOR i IN 1 .. 600 LOOP
+    -- simulate varying sizes (~50MB baseline + jitter)
+    v_size1 := 52428800 + MOD(DBMS_UTILITY.GET_TIME * i,      52428800);
+    v_size2 := 52428800 + MOD(DBMS_UTILITY.GET_TIME * (i + 5), 52428800);
+
+    -- build the two BLOBs
+    l_blob1 := make_blob(v_size1, 'S');  -- SMG3_LOGGING_DATA
+    l_blob2 := make_blob(v_size2, 'F');  -- FILTRATION_JSON_DATA
+
+    INSERT INTO GD.CIM_OFM_SMG3_LOGGING
+      (TRACE_ID, ALIAS, AUDIT_CREATE_DATE, SMG3_LOGGING_DATA, FILTRATION_JSON_DATA)
+    VALUES
+      (SYS_GUID(),
+       CASE MOD(i, 2) WHEN 0 THEN 'ASIA' ELSE 'EU' END,
+       SYSTIMESTAMP,       -- keep hours/minutes/seconds
+       l_blob1,
+       l_blob2);
+
+    -- free the temps each iteration
+    DBMS_LOB.FREETEMPORARY(l_blob1);
+    DBMS_LOB.FREETEMPORARY(l_blob2);
+  END LOOP;
+
   COMMIT;
 END;
+/
