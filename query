@@ -1,20 +1,8 @@
-SELECT
-    df.tablespace_name,
-    df.total_mb,
-    NVL(fs.free_mb, 0) AS free_mb,
-    (df.total_mb - NVL(fs.free_mb, 0)) AS used_mb,
-    ROUND(((df.total_mb - NVL(fs.free_mb, 0)) / df.total_mb) * 100, 2) AS pct_used
-FROM
-    (SELECT
-         tablespace_name,
-         SUM(bytes) / 1024 / 1024 AS total_mb
-     FROM dba_data_files
-     GROUP BY tablespace_name) df
-LEFT JOIN
-    (SELECT
-         tablespace_name,
-         SUM(bytes) / 1024 / 1024 AS free_mb
-     FROM dba_free_space
-     GROUP BY tablespace_name) fs
-ON df.tablespace_name = fs.tablespace_name
-ORDER BY pct_used DESC;
+INSERT INTO GD.CIM_OFM_SMG3_LOGGING
+  (TRACE_ID, ALIAS, AUDIT_CREATE_DATE, SMG3_LOGGING_DATA, FILTRATION_JSON_DATA)
+VALUES
+  (SYS_GUID(),
+   'ASIA',
+   SYSTIMESTAMP,
+   UTL_RAW.CAST_TO_RAW('SMG3_SAMPLE_DATA'),
+   UTL_RAW.CAST_TO_RAW('FILTRATION_SAMPLE_DATA'));
